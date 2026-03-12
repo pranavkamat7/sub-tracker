@@ -26,22 +26,24 @@ const CATEGORY_ICONS = {
 const CURRENCY_SYMBOLS = { USD:"$", EUR:"€", GBP:"£", INR:"₹", CAD:"C$", AUD:"A$" };
 const sym = (c) => CURRENCY_SYMBOLS[c] || c;
 
-// Fetch live rates from Frankfurter (ECB-backed, no API key, no rate limits)
-// Returns toINR map e.g. { USD: 83.5, EUR: 90.2, GBP: 105.1, CAD: 61.3, AUD: 54.8, INR: 1 }
+// Fetch live rates from open.er-api.com — updates every ~60 mins, no API key needed
 async function fetchRatesToINR() {
   const res = await fetch(
-    "https://api.frankfurter.dev/v1/latest?base=INR&symbols=USD,EUR,GBP,CAD,AUD",
+    "https://open.er-api.com/v6/latest/INR",
     { cache: "no-store" }
   );
-  if (!res.ok) throw new Error(`Frankfurter HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`ExchangeRate-API HTTP ${res.status}`);
   const data = await res.json();
   // data.rates = { USD: 0.01198, ... } meaning 1 INR = 0.01198 USD
   // So 1 USD = 1/0.01198 INR
   const toINR = { INR: 1 };
-  for (const [cur, rate] of Object.entries(data.rates)) {
-    toINR[cur] = parseFloat((1 / rate).toFixed(4));
+  for (const cur of ["USD","EUR","GBP","CAD","AUD"]) {
+    if (data.rates[cur]) toINR[cur] = parseFloat((1 / data.rates[cur]).toFixed(4));
   }
-  return { rates: toINR, date: data.date };
+  // Show exact fetch timestamp instead of rate publish date
+  const now = new Date();
+  const date = `${now.getDate().toString().padStart(2,"0")}-${(now.getMonth()+1).toString().padStart(2,"0")}-${now.getFullYear()} ${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
+  return { rates: toINR, date };
 }
 
 const css = `
@@ -351,10 +353,12 @@ export default function App() {
 
   useEffect(() => { if (signedIn) fetchSubs(); }, [signedIn, fetchSubs]);
 
+  // Sign in — empty prompt string shows account picker without forcing re-consent
   const signIn = () => {
     if (!tokenRef.current) { showToast("⏳ Still loading..."); return; }
-    tokenRef.current.requestAccessToken({ prompt: "consent" });
+    tokenRef.current.requestAccessToken({ prompt: "" });
   };
+
   const signOut = () => {
     const token = window.gapi.client.getToken();
     if (token) { window.google.accounts.oauth2.revoke(token.access_token, () => {}); window.gapi.client.setToken(null); }
@@ -376,7 +380,6 @@ export default function App() {
     if (!form.name.trim() || !form.amount) return showToast("⚠️ Name and amount are required");
     setLoading(true);
     try {
-      // Save original currency + amount — conversion is always done at display time using live rates
       const row = [form.name, form.category, form.amount, form.currency, form.billingCycle, form.nextBillingDate];
       if (editItem !== null) {
         await window.gapi.client.sheets.spreadsheets.values.update({
@@ -439,7 +442,6 @@ export default function App() {
   const maxCat  = Math.max(...catTotals.map(c => c.inr), 1);
   const getBadgeClass = (d) => d <= 3 ? "badge badge-danger" : d <= 7 ? "badge badge-warn" : "badge badge-ok";
 
-  // Live conversion preview inside modal
   const previewINR = form.amount && form.currency !== "INR" && rates
     ? convertToINR(parseFloat(form.amount) || 0, form.currency)
     : null;
@@ -510,7 +512,7 @@ export default function App() {
             ? "Fetching live exchange rates…"
             : ratesError
               ? "⚠️ Live rates unavailable · using approximate fallback"
-              : `Live rates · ${ratesDate} · 1 USD = ₹${rates.USD?.toFixed(2)} · 1 EUR = ₹${rates.EUR?.toFixed(2)} · 1 GBP = ₹${rates.GBP?.toFixed(2)} · 1 CAD = ₹${rates.CAD?.toFixed(2)} · 1 AUD = ₹${rates.AUD?.toFixed(2)}`
+              : `Live rates · fetched ${ratesDate} · 1 USD = ₹${rates.USD?.toFixed(2)} · 1 EUR = ₹${rates.EUR?.toFixed(2)} · 1 GBP = ₹${rates.GBP?.toFixed(2)} · 1 CAD = ₹${rates.CAD?.toFixed(2)} · 1 AUD = ₹${rates.AUD?.toFixed(2)}`
           }
         </div>
 
