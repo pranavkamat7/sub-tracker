@@ -3,78 +3,85 @@ import { useState, useEffect, useCallback, useRef } from "react";
 const CLIENT_ID = "872324162882-nsn0o9lmv770lm61ijul6conkeuqp1pt.apps.googleusercontent.com";
 const SHEET_ID = "18qPN8GXUvlJvW2STFFnj6vmKxPgD8vuqjtish7CdTQw";
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
-const RANGE = "Subscriptions!A2:F";
+const RANGE = "Subscriptions!A2:K";
 
-const CATEGORIES = ["Design","Social Media","BD","Tech","Ops"];
+const CATEGORIES = ["Design","Social Media","BD","Tech","Ops","SEO","Other"];
 const CURRENCIES = ["INR","USD","EUR","GBP","CAD","AUD"];
 const BILLING_CYCLES = ["Monthly","Yearly","Weekly","Quarterly"];
 
 const CATEGORY_COLORS = {
-  Design: "#FF6B6B",
-  "Social Media": "#A78BFA",
-  BD: "#34D399",
-  Tech: "#60A5FA",
-  Ops: "#FBBF24"
+  Design: "#FF6B6B", "Social Media": "#A78BFA", BD: "#34D399",
+  Tech: "#60A5FA", Ops: "#FBBF24", SEO: "#2d382c", Other: "#94969e"
 };
 const CATEGORY_ICONS = {
-  Design: "🎨",
-  "Social Media": "📱",
-  BD: "💼",
-  Tech: "💻",
-  Ops: "⚙️"
+  Design: "🎨", "Social Media": "📱", BD: "💼",
+  Tech: "💻", Ops: "⚙️", SEO: "🔍", Other: "❓"
 };
 const CURRENCY_SYMBOLS = { USD:"$", EUR:"€", GBP:"£", INR:"₹", CAD:"C$", AUD:"A$" };
 const sym = (c) => CURRENCY_SYMBOLS[c] || c;
 
-// Fetch live rates from open.er-api.com — updates every ~60 mins, no API key needed
 async function fetchRatesToINR() {
-  const res = await fetch(
-    "https://open.er-api.com/v6/latest/INR",
-    { cache: "no-store" }
-  );
+  const res = await fetch("https://open.er-api.com/v6/latest/INR", { cache: "no-store" });
   if (!res.ok) throw new Error(`ExchangeRate-API HTTP ${res.status}`);
   const data = await res.json();
-  // data.rates = { USD: 0.01198, ... } meaning 1 INR = 0.01198 USD
-  // So 1 USD = 1/0.01198 INR
   const toINR = { INR: 1 };
   for (const cur of ["USD","EUR","GBP","CAD","AUD"]) {
     if (data.rates[cur]) toINR[cur] = parseFloat((1 / data.rates[cur]).toFixed(4));
   }
-  // Show exact fetch timestamp instead of rate publish date
   const now = new Date();
   const date = `${now.getDate().toString().padStart(2,"0")}-${(now.getMonth()+1).toString().padStart(2,"0")}-${now.getFullYear()} ${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
   return { rates: toINR, date };
 }
 
+// ── Excel export (no library needed — generates real XLSX via CSV fallback as .xls which Excel opens natively)
+function exportToExcel(subs, rates) {
+  const headers = ["Name","Category","Amount","Currency","Billing Cycle","Next Billing Date","Email ID","User ID","Password","App Link","Invoice Link","Monthly Cost (INR)"];
+  const toMonthlyINR = (sub) => {
+    const r = rates || {};
+    const inr = sub.amount * (r[sub.currency] ?? 1);
+    if (sub.billingCycle === "Yearly") return inr / 12;
+    if (sub.billingCycle === "Weekly") return inr * 4.33;
+    if (sub.billingCycle === "Quarterly") return inr / 3;
+    return inr;
+  };
+  const rows = subs.map(s => [
+    s.name, s.category, s.amount, s.currency, s.billingCycle,
+    s.nextBillingDate, s.emailId, s.userId, s.password, s.appLink, s.invoiceLink,
+    toMonthlyINR(s).toFixed(2)
+  ]);
+
+  // Build HTML table — Excel opens this perfectly as .xls
+  let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Subscriptions</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
+<body><table border="1">`;
+  html += `<tr>${headers.map(h=>`<th style="background:#1A1916;color:#fff;font-weight:bold;padding:8px 12px;">${h}</th>`).join("")}</tr>`;
+  rows.forEach((row, ri) => {
+    html += `<tr>${row.map(cell=>`<td style="padding:6px 12px;background:${ri%2===0?"#FAFAF8":"#fff"}">${cell ?? ""}</td>`).join("")}</tr>`;
+  });
+  html += `</table></body></html>`;
+
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `SubTrackr_Export_${new Date().toISOString().slice(0,10)}.xls`;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #FAFAF8;
-    --surface: #FFFFFF;
-    --surface2: #F7F6F2;
-    --border: #E8E6DF;
-    --border2: #D5D2C8;
-    --text: #1A1916;
-    --text2: #6B6860;
-    --text3: #9E9B94;
-    --accent: #E8572A;
-    --green: #2D9B6F;
+    --bg: #FAFAF8; --surface: #FFFFFF; --surface2: #F7F6F2; --border: #E8E6DF; --border2: #D5D2C8;
+    --text: #1A1916; --text2: #6B6860; --text3: #9E9B94; --accent: #E8572A; --green: #2D9B6F;
     --yellow: #D4A017;
     --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
     --shadow: 0 4px 16px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
     --shadow-lg: 0 20px 60px rgba(0,0,0,0.12), 0 8px 20px rgba(0,0,0,0.06);
-    --radius: 16px;
-    --radius-sm: 10px;
-    --radius-xs: 6px;
-    --font-display: 'Plus Jakarta Sans', sans-serif;
-    --font-body: 'Space Grotesk', sans-serif;
+    --radius: 16px; --radius-sm: 10px; --radius-xs: 6px;
+    --font-display: 'Plus Jakarta Sans', sans-serif; --font-body: 'Space Grotesk', sans-serif;
   }
-
   body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; -webkit-font-smoothing: antialiased; }
-
   .app { max-width: 1160px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
   /* HEADER */
@@ -83,15 +90,17 @@ const css = `
   .logo-mark { width: 40px; height: 40px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(232,87,42,0.3); }
   .logo { font-family: var(--font-display); font-size: 1.4rem; font-weight: 800; color: var(--text); letter-spacing: -0.03em; }
   .logo span { color: var(--accent); }
-  .hdr-right { display: flex; gap: 0.6rem; align-items: center; }
+  .hdr-right { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 
   /* RATES BAR */
-  .rates-bar { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; font-weight: 500; color: var(--text3); background: var(--surface2); border: 1.5px solid var(--border); border-radius: 99px; padding: 0.28rem 0.75rem; margin-bottom: 2rem; letter-spacing: 0.01em; }
+  .rates-bar { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; font-weight: 500; color: var(--text3); background: var(--surface2); border: 1.5px solid var(--border); border-radius: 99px; padding: 0.28rem 0.75rem; margin-bottom: 2rem; letter-spacing: 0.01em; flex-wrap: wrap; }
   .rates-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-  .rates-dot-live { background: #2D9B6F; }
-  .rates-dot-loading { background: #D4A017; animation: rpulse 1s infinite; }
-  .rates-dot-error { background: #E8572A; }
+  .rates-dot-live { background: #2D9B6F; } .rates-dot-loading { background: #D4A017; animation: rpulse 1s infinite; } .rates-dot-error { background: #E8572A; }
   @keyframes rpulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* SILENT AUTH BANNER */
+  .auth-banner { display: flex; align-items: center; gap: 0.6rem; background: #EFF6FF; border: 1.5px solid #BFDBFE; border-radius: 10px; padding: 0.6rem 1rem; margin-bottom: 1.2rem; font-size: 0.78rem; color: #1D4ED8; font-weight: 500; }
+  .auth-banner-dot { width: 7px; height: 7px; border-radius: 50%; background: #3B82F6; animation: rpulse 1.2s infinite; flex-shrink: 0; }
 
   /* BUTTONS */
   .btn { font-family: var(--font-body); font-size: 0.875rem; font-weight: 600; border: none; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.18s cubic-bezier(0.2,0,0,1); padding: 0.6rem 1.1rem; letter-spacing: -0.01em; }
@@ -103,6 +112,8 @@ const css = `
   .btn-ghost:hover { background: var(--border); }
   .btn-accent { background: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(232,87,42,0.35); }
   .btn-accent:hover { background: #d04a20; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(232,87,42,0.4); }
+  .btn-green { background: var(--green); color: #fff; box-shadow: 0 4px 14px rgba(45,155,111,0.3); }
+  .btn-green:hover { background: #248a5e; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(45,155,111,0.35); }
   .btn-sm { padding: 0.45rem 0.85rem; font-size: 0.8rem; }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
@@ -142,17 +153,16 @@ const css = `
   .uamt { font-family: var(--font-display); font-size: 0.9rem; font-weight: 700; }
   .uamt-orig { font-size: 0.68rem; color: var(--text3); margin-top: 0.1rem; }
   .badge { font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 99px; letter-spacing: 0.04em; }
-  .badge-warn { background: #FEF3C7; color: #D97706; }
-  .badge-ok { background: #D1FAE5; color: #059669; }
-  .badge-danger { background: #FEE2E2; color: #DC2626; }
+  .badge-warn { background: #FEF3C7; color: #D97706; } .badge-ok { background: #D1FAE5; color: #059669; } .badge-danger { background: #FEE2E2; color: #DC2626; }
 
   /* TABLE */
   .twrap { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
-  .thdr { display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 1.5rem; border-bottom: 1.5px solid var(--border); background: var(--surface2); }
+  .thdr { display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 1.5rem; border-bottom: 1.5px solid var(--border); background: var(--surface2); flex-wrap: wrap; gap: 0.6rem; }
   .thdr-title { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; }
+  .thdr-right { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
   table { width: 100%; border-collapse: collapse; }
   th { text-align: left; font-size: 0.7rem; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; padding: 0.85rem 1.5rem; border-bottom: 1.5px solid var(--border); background: var(--surface2); }
-  td { padding: 1rem 1.5rem; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
+  td { padding: 1rem 1.5rem; font-size: 0.875rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
   tbody tr { transition: background 0.12s; }
   tbody tr:hover td { background: var(--surface2); }
@@ -162,26 +172,37 @@ const css = `
   .acts { display: flex; gap: 0.3rem; }
   .ibtn { background: none; border: none; cursor: pointer; font-size: 0.9rem; padding: 0.3rem 0.4rem; border-radius: var(--radius-xs); transition: background 0.15s; color: var(--text3); }
   .ibtn:hover { background: var(--surface2); color: var(--text); }
+  .link-cell { color: #2563EB; text-decoration: none; font-size: 0.78rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem; }
+  .link-cell:hover { text-decoration: underline; }
+  /* password mask */
+  .pwd-cell { display: flex; align-items: center; gap: 0.4rem; }
+  .pwd-text { font-family: monospace; font-size: 0.82rem; letter-spacing: 0.05em; }
+  .pwd-toggle { background: none; border: none; cursor: pointer; font-size: 0.8rem; color: var(--text3); padding: 0.1rem 0.25rem; border-radius: 4px; transition: background 0.12s; }
+  .pwd-toggle:hover { background: var(--border); }
   @media(max-width:700px){ th, td { padding: 0.7rem 0.9rem; } .hide-mobile { display: none; } }
 
   /* MODAL */
-  .ov { position: fixed; inset: 0; background: rgba(26,25,22,0.5); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; animation: fadeIn 0.2s ease; }
+  .ov { position: fixed; inset: 0; background: rgba(26,25,22,0.55); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; animation: fadeIn 0.2s ease; overflow-y: auto; }
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
-  .modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 2rem; width: 100%; max-width: 460px; box-shadow: var(--shadow-lg); animation: slideUp 0.25s cubic-bezier(0.16,1,0.3,1); }
+  .modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 2rem; width: 100%; max-width: 520px; box-shadow: var(--shadow-lg); animation: slideUp 0.25s cubic-bezier(0.16,1,0.3,1); margin: auto; }
   @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
-  .modal-title { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; margin-bottom: 1.5rem; letter-spacing: -0.02em; }
+  .modal-title { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; margin-bottom: 0.4rem; letter-spacing: -0.02em; }
+  .modal-sub { font-size: 0.78rem; color: var(--text3); margin-bottom: 1.5rem; }
+  .section-divider { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--text3); margin: 1.2rem 0 0.8rem; padding-bottom: 0.4rem; border-bottom: 1.5px solid var(--border); display: flex; align-items: center; gap: 0.4rem; }
   .fg { margin-bottom: 1rem; }
   label { display: block; font-size: 0.73rem; font-weight: 700; color: var(--text2); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.08em; }
-  input, select { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-body); font-size: 0.9rem; font-weight: 500; padding: 0.7rem 0.9rem; transition: border 0.18s, box-shadow 0.18s; -webkit-appearance: none; appearance: none; cursor: pointer; }
-  input[type="date"] { cursor: pointer; position: relative; }
-  input[type="date"]::-webkit-calendar-picker-indicator { background: transparent; bottom: 0; color: transparent; cursor: pointer; height: auto; left: 0; position: absolute; right: 0; top: 0; width: auto; }
+  input, select { width: 100%; background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: var(--font-body); font-size: 0.9rem; font-weight: 500; padding: 0.7rem 0.9rem; transition: border 0.18s, box-shadow 0.18s; -webkit-appearance: none; appearance: none; }
   input:focus, select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(232,87,42,0.12); }
-  select option { background: #fff; }
   .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
   @media(max-width:400px){ .frow { grid-template-columns: 1fr; } }
   .macts { display: flex; gap: 0.7rem; justify-content: flex-end; margin-top: 1.5rem; }
   .preview-inr { font-size: 0.78rem; color: var(--text2); background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: var(--radius-xs); padding: 0.45rem 0.75rem; margin-top: 0.4rem; display: flex; align-items: center; gap: 0.4rem; }
   .preview-inr strong { color: var(--green); font-family: var(--font-display); }
+  .pwd-input-wrap { position: relative; }
+  .pwd-input-wrap input { padding-right: 2.8rem; }
+  .pwd-eye { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--text3); padding: 0.2rem; }
+  .optional-tag { font-size: 0.62rem; font-weight: 500; color: var(--text3); text-transform: none; letter-spacing: 0; margin-left: 0.3rem; }
+  .drive-hint { font-size: 0.72rem; color: var(--text3); margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; }
 
   /* LOGIN */
   .lscreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 1rem; }
@@ -196,6 +217,7 @@ const css = `
   .gbtn { display: flex; align-items: center; justify-content: center; gap: 0.75rem; background: var(--text); color: #fff; border: none; border-radius: 12px; padding: 0.9rem 1.5rem; font-size: 0.9rem; font-weight: 700; cursor: pointer; width: 100%; transition: all 0.2s; font-family: var(--font-body); letter-spacing: -0.01em; }
   .gbtn:hover { background: #2d2b28; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(26,25,22,0.25); }
   .gbtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+  .silent-status { font-size: 0.75rem; color: var(--text3); display: flex; align-items: center; gap: 0.5rem; justify-content: center; margin-top: 0.8rem; }
 
   /* MISC */
   .empty { text-align: center; padding: 3rem 1.5rem; color: var(--text3); }
@@ -207,10 +229,8 @@ const css = `
   .spin-dark { border-color: rgba(26,25,22,0.2); border-top-color: var(--text); }
   @keyframes rot { to{transform:rotate(360deg)} }
   .errbox { background: #FEE2E2; border: 1.5px solid #FECACA; border-radius: 12px; padding: 1rem; color: #DC2626; font-size: 0.82rem; margin-top: 1rem; line-height: 1.6; text-align: left; }
-  .statusbar { font-size: 0.75rem; color: var(--text3); display: flex; align-items: center; gap: 0.5rem; }
   .table-scroll { overflow-x: auto; }
   .date-wrap { position: relative; }
-  .date-wrap input[type="date"] { padding-right: 2.5rem; }
   .date-icon { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; pointer-events: none; color: var(--text3); }
 `;
 
@@ -254,51 +274,79 @@ function DonutChart({ data }) {
   );
 }
 
+
+
+const EMPTY_FORM = {
+  name: "", category: "Design", amount: "", currency: "INR",
+  billingCycle: "Monthly", nextBillingDate: "",
+  emailId: "", userId: "", password: "", appLink: "", invoiceLink: ""
+};
+
 export default function App() {
-  const [gapiReady, setGapiReady] = useState(false);
-  const [gsiReady, setGsiReady] = useState(false);
-  const [signedIn, setSignedIn] = useState(false);
-  const [subs, setSubs] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
-  const [editItem, setEditItem] = useState(null);
-  const [toast, setToast] = useState(null);
-  const [initError, setInitError] = useState(null);
-  const [status, setStatus] = useState("Loading Google APIs...");
-  const [rates, setRates] = useState(null);
-  const [ratesDate, setRatesDate] = useState(null);
-  const [ratesError, setRatesError] = useState(false);
-  const [form, setForm] = useState({
-    name: "", category: "Design", amount: "", currency: "INR", billingCycle: "Monthly", nextBillingDate: ""
-  });
-  const tokenRef = useRef(null);
+  const [gapiReady, setGapiReady]     = useState(false);
+  const [gsiReady, setGsiReady]       = useState(false);
+  const [signedIn, setSignedIn]       = useState(false);
+  const [silentTrying, setSilentTrying] = useState(true); // attempting silent auth on load
+  const [subs, setSubs]               = useState([]);
+  const [loading, setLoading]         = useState(false);
+  const [showModal, setShowModal]     = useState(false);
+  const [editItem, setEditItem]       = useState(null);
+  const [toast, setToast]             = useState(null);
+  const [initError, setInitError]     = useState(null);
+  const [status, setStatus]           = useState("Loading Google APIs...");
+  const [rates, setRates]             = useState(null);
+  const [ratesDate, setRatesDate]     = useState(null);
+  const [ratesError, setRatesError]   = useState(false);
+  const [showPwd, setShowPwd]         = useState(false);
+  const [form, setForm]               = useState(EMPTY_FORM);
+  const tokenRef  = useRef(null);
   const showToast = useCallback((msg) => setToast(msg), []);
 
-  // Fetch live rates on mount
+  // Live exchange rates
   useEffect(() => {
     fetchRatesToINR()
       .then(({ rates: r, date }) => { setRates(r); setRatesDate(date); })
       .catch(() => {
         setRatesError(true);
-        // Graceful fallback — approximate rates so the app remains usable
         setRates({ INR: 1, USD: 83.5, EUR: 90.2, GBP: 105.8, CAD: 61.5, AUD: 54.3 });
       });
   }, []);
 
-  // Convert any currency → INR using live rates
   const convertToINR = useCallback((amount, currency) => {
     if (!rates) return amount;
     return amount * (rates[currency] ?? 1);
   }, [rates]);
 
-  // Format INR with Indian number system (L = Lakh, Cr = Crore)
   const fmtINR = (n) => {
-    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-    if (n >= 100000)   return `₹${(n / 100000).toFixed(2)}L`;
-    if (n >= 1000)     return `₹${(n / 1000).toFixed(1)}K`;
+    if (n >= 10000000) return `₹${(n/10000000).toFixed(2)}Cr`;
+    if (n >= 100000)   return `₹${(n/100000).toFixed(2)}L`;
+    if (n >= 1000)     return `₹${(n/1000).toFixed(1)}K`;
     return `₹${n.toFixed(2)}`;
   };
 
+  // ── Silent re-auth helper ────────────────────────────────────────────────
+  // Called once both GAPI + GSI are loaded. Uses prompt:"none" — no popup ever.
+  // If user previously granted access, Google returns a token silently.
+  const attemptSilentAuth = useCallback(() => {
+    if (!tokenRef.current) return;
+    tokenRef.current.requestAccessToken({ prompt: "none" });
+    // setSilentTrying stays true until callback fires (success or error)
+    // We give it a 5s timeout, then let the user click manually
+    setTimeout(() => setSilentTrying(false), 5000);
+  }, []);
+
+  // Track when both scripts are ready so we can attempt silent auth once
+  const markReady = useCallback((which) => {
+    setStatus(`${which} ready`);
+    // We use a module-level flag to avoid stale closure issues
+    if (which === "GAPI") window.__subtrackr_gapi = true;
+    if (which === "GSI")  window.__subtrackr_gsi  = true;
+    if (window.__subtrackr_gapi && window.__subtrackr_gsi) {
+      attemptSilentAuth();
+    }
+  }, [attemptSilentAuth]);
+
+  // Load GAPI
   useEffect(() => {
     const s = document.createElement("script");
     s.src = "https://apis.google.com/js/api.js"; s.async = true;
@@ -307,35 +355,58 @@ export default function App() {
         try {
           await window.gapi.client.init({ discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"] });
           setGapiReady(true);
-          setStatus(prev => prev === "GSI ready" ? "Ready" : "GAPI ready");
+          markReady("GAPI");
         } catch {
           setInitError("Google Sheets API failed to initialise. Make sure your origin is listed under Authorised JavaScript Origins in Google Cloud Console.");
+          setSilentTrying(false);
         }
       });
     };
-    s.onerror = () => setInitError("Failed to load Google APIs – check your internet connection.");
+    s.onerror = () => { setInitError("Failed to load Google APIs – check your internet connection."); setSilentTrying(false); };
     document.body.appendChild(s);
-  }, []);
+  }, [markReady]);
 
+  // Load GSI
   useEffect(() => {
     const s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client"; s.async = true;
     s.onload = () => {
       try {
         tokenRef.current = window.google.accounts.oauth2.initTokenClient({
-          client_id: CLIENT_ID, scope: SCOPES,
+          client_id: CLIENT_ID,
+          scope: SCOPES,
           callback: (resp) => {
-            if (resp.error) { showToast("❌ Sign-in error: " + resp.error); return; }
+            setSilentTrying(false);
+            if (resp.error) {
+              // "access_denied" or "interaction_required" = silent auth failed, need manual click
+              if (resp.error !== "interaction_required" && resp.error !== "access_denied") {
+                showToast("❌ Sign-in error: " + resp.error);
+              }
+              return;
+            }
             setSignedIn(true);
           },
+          // Re-authenticate silently every 50 minutes (token lasts 60 min)
+          // by listening for token expiry implicitly — handled via auto re-request before calls
         });
         setGsiReady(true);
-        setStatus(prev => prev === "GAPI ready" ? "Ready" : "GSI ready");
-      } catch { setInitError("Google Sign-In failed to initialise. Check your Client ID."); }
+        markReady("GSI");
+      } catch { setInitError("Google Sign-In failed to initialise. Check your Client ID."); setSilentTrying(false); }
     };
-    s.onerror = () => setInitError("Failed to load Google Sign-In script.");
+    s.onerror = () => { setInitError("Failed to load Google Sign-In script."); setSilentTrying(false); };
     document.body.appendChild(s);
-  }, [showToast]);
+  }, [markReady, showToast]);
+
+  // ── Auto-refresh token every 50 minutes to keep session alive ────────────
+  useEffect(() => {
+    if (!signedIn) return;
+    const interval = setInterval(() => {
+      if (tokenRef.current) {
+        tokenRef.current.requestAccessToken({ prompt: "none" });
+      }
+    }, 50 * 60 * 1000); // 50 minutes
+    return () => clearInterval(interval);
+  }, [signedIn]);
 
   const fetchSubs = useCallback(async () => {
     setLoading(true);
@@ -343,9 +414,12 @@ export default function App() {
       const res = await window.gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: RANGE });
       const rows = res.result.values || [];
       setSubs(rows.map((r, i) => ({
-        id: i, name: r[0] || "", category: r[1] || "Other",
+        id: i,
+        name: r[0] || "", category: r[1] || "Other",
         amount: parseFloat(r[2]) || 0, currency: r[3] || "INR",
         billingCycle: r[4] || "Monthly", nextBillingDate: r[5] || "",
+        emailId: r[6] || "", userId: r[7] || "",
+        password: r[8] || "", appLink: r[9] || "", invoiceLink: r[10] || "",
       })));
     } catch { showToast("❌ Could not load data from Google Sheets"); }
     setLoading(false);
@@ -353,7 +427,6 @@ export default function App() {
 
   useEffect(() => { if (signedIn) fetchSubs(); }, [signedIn, fetchSubs]);
 
-  // Sign in — empty prompt string shows account picker without forcing re-consent
   const signIn = () => {
     if (!tokenRef.current) { showToast("⏳ Still loading..."); return; }
     tokenRef.current.requestAccessToken({ prompt: "" });
@@ -366,31 +439,39 @@ export default function App() {
   };
 
   const openAdd = () => {
-    setEditItem(null);
-    setForm({ name: "", category: "Design", amount: "", currency: "INR", billingCycle: "Monthly", nextBillingDate: "" });
-    setShowModal(true);
+    setEditItem(null); setForm(EMPTY_FORM); setShowPwd(false); setShowModal(true);
   };
   const openEdit = (sub) => {
     setEditItem(sub);
-    setForm({ name: sub.name, category: sub.category, amount: String(sub.amount), currency: sub.currency, billingCycle: sub.billingCycle, nextBillingDate: sub.nextBillingDate });
-    setShowModal(true);
+    setForm({
+      name: sub.name, category: sub.category, amount: String(sub.amount),
+      currency: sub.currency, billingCycle: sub.billingCycle, nextBillingDate: sub.nextBillingDate,
+      emailId: sub.emailId, userId: sub.userId, password: sub.password,
+      appLink: sub.appLink, invoiceLink: sub.invoiceLink,
+    });
+    setShowPwd(false); setShowModal(true);
   };
+
+  const rowFromForm = () => [
+    form.name, form.category, form.amount, form.currency, form.billingCycle,
+    form.nextBillingDate, form.emailId, form.userId, form.password, form.appLink, form.invoiceLink
+  ];
 
   const saveSub = async () => {
     if (!form.name.trim() || !form.amount) return showToast("⚠️ Name and amount are required");
     setLoading(true);
     try {
-      const row = [form.name, form.category, form.amount, form.currency, form.billingCycle, form.nextBillingDate];
+      const row = rowFromForm();
       if (editItem !== null) {
         await window.gapi.client.sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID,
-          range: `Subscriptions!A${editItem.id + 2}:F${editItem.id + 2}`,
+          range: `Subscriptions!A${editItem.id + 2}:K${editItem.id + 2}`,
           valueInputOption: "RAW", resource: { values: [row] },
         });
         showToast("✅ Updated!");
       } else {
         await window.gapi.client.sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID, range: "Subscriptions!A:F",
+          spreadsheetId: SHEET_ID, range: "Subscriptions!A:K",
           valueInputOption: "RAW", resource: { values: [row] },
         });
         showToast("✅ Added!");
@@ -415,7 +496,7 @@ export default function App() {
     setLoading(false);
   };
 
-  // ── Analytics (all in ₹) ──────────────────────────────────────────────────
+  // ── Analytics ─────────────────────────────────────────────────────────────
   const toMonthlyINR = (sub) => {
     const inr = convertToINR(sub.amount, sub.currency);
     if (sub.billingCycle === "Yearly")    return inr / 12;
@@ -441,12 +522,12 @@ export default function App() {
   const isReady = gapiReady && gsiReady;
   const maxCat  = Math.max(...catTotals.map(c => c.inr), 1);
   const getBadgeClass = (d) => d <= 3 ? "badge badge-danger" : d <= 7 ? "badge badge-warn" : "badge badge-ok";
-
   const previewINR = form.amount && form.currency !== "INR" && rates
-    ? convertToINR(parseFloat(form.amount) || 0, form.currency)
-    : null;
+    ? convertToINR(parseFloat(form.amount) || 0, form.currency) : null;
 
-  // ── Login ──────────────────────────────────────────────────────────────────
+  const setF = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
+
+  // ── Login screen ───────────────────────────────────────────────────────────
   if (!signedIn) {
     return (
       <>
@@ -457,7 +538,13 @@ export default function App() {
             <div className="ltitle">Sub<span>Trackr</span></div>
             <div className="lsub">Track every subscription in one place. All costs shown in ₹ with live exchange rates.</div>
             <div className="lfeatures">
-              {[["📊","Visual spend analytics by category"],["₹","Live currency conversion to Rupees"],["🔔","Upcoming renewal reminders"]].map(([icon,text],i)=>(
+              {[
+                ["📊","Visual spend analytics by category"],
+                ["₹","Live currency conversion to Rupees"],
+                ["🔔","Upcoming renewal reminders"],
+                ["🔑","Store credentials & invoice links"],
+                ["📥","Export full data to Excel"],
+              ].map(([icon,text],i) => (
                 <div className="lfeat" key={i}><div className="lfeat-icon">{icon}</div><span>{text}</span></div>
               ))}
             </div>
@@ -465,18 +552,19 @@ export default function App() {
               <div className="errbox">⚠️ {initError}</div>
             ) : (
               <>
-                <button className="gbtn" onClick={signIn} disabled={!isReady}>
+                <button className="gbtn" onClick={signIn} disabled={!isReady || silentTrying}>
                   <svg width="18" height="18" viewBox="0 0 48 48">
                     <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/>
                     <path fill="#34A853" d="M2 24c0-3.3.7-6.4 1.9-9.2L8.3 19c-.5 1.6-.8 3.2-.8 5s.3 3.4.8 5l-4.4 3.8C2.7 30.4 2 27.3 2 24z"/>
                     <path fill="#FBBC05" d="M24 46c5.6 0 10.3-1.9 13.8-5l-6.7-5.2C29.4 37.3 26.9 38 24 38c-6 0-11.1-4-12.9-9.5L6.7 32.3C10.1 39.4 16.5 46 24 46z"/>
                     <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.3-4.3 5.7l6.7 5.2C42.1 36.2 44.5 30.5 44.5 24c0-1.3-.2-2.7-.5-4z"/>
                   </svg>
-                  {isReady ? "Continue with Google" : "Loading…"}
+                  {silentTrying ? "Signing you in…" : isReady ? "Continue with Google" : "Loading…"}
                 </button>
-                {!isReady && (
-                  <div className="statusbar" style={{ justifyContent:"center", marginTop:"0.8rem" }}>
-                    <div className="spin spin-dark" /><span>{status}</span>
+                {(silentTrying || !isReady) && (
+                  <div className="silent-status">
+                    <div className="spin spin-dark" />
+                    <span>{silentTrying ? "Attempting silent sign-in…" : status}</span>
                   </div>
                 )}
               </>
@@ -500,12 +588,13 @@ export default function App() {
           </div>
           <div className="hdr-right">
             {loading && <div className="spin spin-dark" />}
+            <button className="btn btn-green btn-sm" onClick={() => exportToExcel(subs, rates)}>📥 Export Excel</button>
             <button className="btn btn-accent" onClick={openAdd}>+ Add Subscription</button>
             <button className="btn btn-danger btn-sm" onClick={signOut}>Sign Out</button>
           </div>
         </div>
 
-        {/* Live rates status bar */}
+        {/* Silent auth reminder — shown briefly after token refresh */}
         <div className="rates-bar">
           <span className={`rates-dot ${!rates ? "rates-dot-loading" : ratesError ? "rates-dot-error" : "rates-dot-live"}`} />
           {!rates
@@ -519,11 +608,11 @@ export default function App() {
         {/* Stats */}
         <div className="sgrid">
           {[
-            { label:"Monthly Cost",  value: fmtINR(monthlyTotal),                                          sub:"all subs · live ₹ rate", icon:"💸", accent:true },
-            { label:"Yearly Total",  value: fmtINR(yearlyTotal),                                           sub:"projected annual spend",   icon:"📅" },
-            { label:"Active Subs",   value: subs.length,                                                   sub:"subscriptions tracked",    icon:"📋" },
-            { label:"Avg / Sub",     value: fmtINR(subs.length ? monthlyTotal / subs.length : 0),          sub:"monthly average in ₹",    icon:"📊" },
-          ].map((s,i)=>(
+            { label:"Monthly Cost",  value: fmtINR(monthlyTotal), sub:"all subs · live ₹ rate", icon:"💸", accent:true },
+            { label:"Yearly Total",  value: fmtINR(yearlyTotal),  sub:"projected annual spend",  icon:"📅" },
+            { label:"Active Subs",   value: subs.length,          sub:"subscriptions tracked",   icon:"📋" },
+            { label:"Avg / Sub",     value: fmtINR(subs.length ? monthlyTotal / subs.length : 0), sub:"monthly average in ₹", icon:"📊" },
+          ].map((s,i) => (
             <div className={`scard${s.accent?" scard-accent":""}`} key={i}>
               <div className="scard-bg">{s.icon}</div>
               <span className="slabel">{s.label}</span>
@@ -542,7 +631,7 @@ export default function App() {
             <div className="ctitle">Category Breakdown (₹ / mo)</div>
             {catTotals.length === 0
               ? <div className="empty"><div className="eicon">📊</div><p>No data yet</p></div>
-              : [...catTotals].sort((a,b)=>b.inr-a.inr).map((c,i)=>(
+              : [...catTotals].sort((a,b)=>b.inr-a.inr).map((c,i) => (
                 <div className="brow" key={i}>
                   <span className="blabel">{CATEGORY_ICONS[c.label]} {c.label}</span>
                   <div className="bwrap"><div className="bbar" style={{ width:`${(c.inr/maxCat)*100}%`, background:c.color }} /></div>
@@ -558,7 +647,7 @@ export default function App() {
             <div className="ctitle">Upcoming Renewals</div>
             {upcoming.length === 0
               ? <div className="empty"><div className="eicon">📅</div><p>Add billing dates to track renewals</p></div>
-              : upcoming.map((s,i)=>(
+              : upcoming.map((s,i) => (
                 <div className="uitem" key={i}>
                   <div>
                     <div className="uname">{s.name}</div>
@@ -580,23 +669,26 @@ export default function App() {
             {subs.length === 0
               ? <div className="empty"><div className="eicon">🔄</div><p>No subscriptions yet</p></div>
               : BILLING_CYCLES.map(cycle => {
-                const count = subs.filter(s => s.billingCycle === cycle).length;
-                return count > 0 ? (
-                  <div className="brow" key={cycle}>
-                    <span className="blabel">{cycle}</span>
-                    <div className="bwrap"><div className="bbar" style={{ width:`${(count/subs.length)*100}%`, background:"linear-gradient(90deg,#E8572A,#FF8A5B)" }} /></div>
-                    <span className="bamt">{count}</span>
-                  </div>
-                ) : null;
-              })
+                  const count = subs.filter(s => s.billingCycle === cycle).length;
+                  return count > 0 ? (
+                    <div className="brow" key={cycle}>
+                      <span className="blabel">{cycle}</span>
+                      <div className="bwrap"><div className="bbar" style={{ width:`${(count/subs.length)*100}%`, background:"linear-gradient(90deg,#E8572A,#FF8A5B)" }} /></div>
+                      <span className="bamt">{count}</span>
+                    </div>
+                  ) : null;
+                })
             }
           </div>
         </div>
 
+        {/* Table */}
         <div className="twrap">
           <div className="thdr">
             <div className="thdr-title">All Subscriptions <span style={{ color:"var(--text3)", fontWeight:500 }}>({subs.length})</span></div>
-            <button className="btn btn-ghost btn-sm" onClick={fetchSubs} disabled={loading}>↻ Refresh</button>
+            <div className="thdr-right">
+              <button className="btn btn-ghost btn-sm" onClick={fetchSubs} disabled={loading}>↻ Refresh</button>
+            </div>
           </div>
           {subs.length === 0
             ? <div className="empty"><div className="eicon">💳</div><p>No subscriptions yet — add your first one!</p></div>
@@ -610,11 +702,12 @@ export default function App() {
                       <th>Amount (₹)</th>
                       <th className="hide-mobile">Cycle</th>
                       <th className="hide-mobile">Next Bill</th>
+                      <th className="hide-mobile">Links</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {subs.map((sub,i)=>(
+                    {subs.map((sub,i) => (
                       <tr key={i}>
                         <td><strong style={{ fontWeight:600 }}>{sub.name}</strong></td>
                         <td>
@@ -630,10 +723,17 @@ export default function App() {
                         </td>
                         <td className="hide-mobile" style={{ color:"var(--text3)", fontSize:"0.82rem" }}>{sub.billingCycle}</td>
                         <td className="hide-mobile" style={{ color:"var(--text3)", fontSize:"0.82rem" }}>{sub.nextBillingDate || "—"}</td>
+                        <td className="hide-mobile">
+                          <div style={{ display:"flex", flexDirection:"column", gap:"0.25rem" }}>
+                            {sub.appLink && <a href={sub.appLink} target="_blank" rel="noopener noreferrer" className="link-cell">🔗 App</a>}
+                            {sub.invoiceLink && <a href={sub.invoiceLink} target="_blank" rel="noopener noreferrer" className="link-cell">🧾 Invoice</a>}
+                            {!sub.appLink && !sub.invoiceLink && <span style={{color:"var(--text3)"}}>—</span>}
+                          </div>
+                        </td>
                         <td>
                           <div className="acts">
-                            <button className="ibtn" onClick={()=>openEdit(sub)} title="Edit">✏️</button>
-                            <button className="ibtn" onClick={()=>deleteSub(sub)} title="Delete">🗑️</button>
+                            <button className="ibtn" onClick={() => openEdit(sub)} title="Edit">✏️</button>
+                            <button className="ibtn" onClick={() => deleteSub(sub)} title="Delete">🗑️</button>
                           </div>
                         </td>
                       </tr>
@@ -646,57 +746,93 @@ export default function App() {
         </div>
       </div>
 
+      {/* Modal */}
       {showModal && (
-        <div className="ov" onClick={e=>e.target===e.currentTarget&&setShowModal(false)}>
+        <div className="ov" onClick={e => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
             <div className="modal-title">{editItem !== null ? "Edit Subscription" : "Add Subscription"}</div>
+            <div className="modal-sub">Fields marked optional can be filled later.</div>
+
+            {/* ── Basic Info ── */}
+            <div className="section-divider">📋 Basic Info</div>
             <div className="fg">
               <label>Service Name</label>
-              <input placeholder="e.g. Netflix, Spotify…" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} />
+              <input placeholder="e.g. Netflix, Figma, Slack…" value={form.name} onChange={setF("name")} />
             </div>
             <div className="frow">
               <div className="fg">
                 <label>Amount</label>
-                <input type="number" placeholder="199" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} />
+                <input type="number" placeholder="199" value={form.amount} onChange={setF("amount")} />
                 {previewINR !== null && previewINR > 0 && (
-                  <div className="preview-inr">
-                    ≈ <strong>{fmtINR(previewINR)}</strong>
+                  <div className="preview-inr">≈ <strong>{fmtINR(previewINR)}</strong>
                     <span style={{ color:"var(--text3)" }}>· 1 {form.currency} = ₹{rates?.[form.currency]?.toFixed(2)}</span>
                   </div>
                 )}
               </div>
               <div className="fg">
                 <label>Currency</label>
-                <select value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))}>
-                  {CURRENCIES.map(c=><option key={c} value={c}>{sym(c)} {c}</option>)}
+                <select value={form.currency} onChange={setF("currency")}>
+                  {CURRENCIES.map(c => <option key={c} value={c}>{sym(c)} {c}</option>)}
                 </select>
               </div>
             </div>
             <div className="frow">
               <div className="fg">
                 <label>Category</label>
-                <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))}>
-                  {CATEGORIES.map(c=><option key={c}>{c}</option>)}
+                <select value={form.category} onChange={setF("category")}>
+                  {CATEGORIES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
               <div className="fg">
                 <label>Billing Cycle</label>
-                <select value={form.billingCycle} onChange={e=>setForm(f=>({...f,billingCycle:e.target.value}))}>
-                  {BILLING_CYCLES.map(c=><option key={c}>{c}</option>)}
+                <select value={form.billingCycle} onChange={setF("billingCycle")}>
+                  {BILLING_CYCLES.map(c => <option key={c}>{c}</option>)}
                 </select>
               </div>
             </div>
             <div className="fg">
               <label>Next Billing Date</label>
               <div className="date-wrap">
-                <input type="date" value={form.nextBillingDate}
-                  onChange={e=>setForm(f=>({...f,nextBillingDate:e.target.value}))}
-                  onClick={e=>{ try{ e.target.showPicker(); }catch(_){} }} />
+                <input type="date" value={form.nextBillingDate} onChange={setF("nextBillingDate")}
+                  onClick={e => { try { e.target.showPicker(); } catch(_) {} }} />
                 <span className="date-icon">📅</span>
               </div>
             </div>
+
+            {/* ── Credentials ── */}
+            <div className="section-divider">🔑 Credentials <span className="optional-tag">(optional)</span></div>
+            <div className="frow">
+              <div className="fg">
+                <label>Email ID</label>
+                <input type="email" placeholder="team@company.com" value={form.emailId} onChange={setF("emailId")} />
+              </div>
+              <div className="fg">
+                <label>User ID / Username</label>
+                <input placeholder="username or account ID" value={form.userId} onChange={setF("userId")} />
+              </div>
+            </div>
+            <div className="fg">
+              <label>Password</label>
+              <div className="pwd-input-wrap">
+                <input type={showPwd ? "text" : "password"} placeholder="app password" value={form.password} onChange={setF("password")} />
+                <button className="pwd-eye" onClick={() => setShowPwd(s => !s)} type="button">{showPwd ? "🙈" : "👁️"}</button>
+              </div>
+            </div>
+
+            {/* ── Links ── */}
+            <div className="section-divider">🔗 Links <span className="optional-tag">(optional)</span></div>
+            <div className="fg">
+              <label>App Link</label>
+              <input type="url" placeholder="https://app.example.com" value={form.appLink} onChange={setF("appLink")} />
+            </div>
+            <div className="fg">
+              <label>Invoice Link <span className="optional-tag">Google Drive / any URL</span></label>
+              <input type="url" placeholder="https://drive.google.com/file/d/…" value={form.invoiceLink} onChange={setF("invoiceLink")} />
+              <div className="drive-hint">💡 Upload invoice to Google Drive → right-click → Copy link → paste here</div>
+            </div>
+
             <div className="macts">
-              <button className="btn btn-ghost" onClick={()=>setShowModal(false)}>Cancel</button>
+              <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-accent" onClick={saveSub} disabled={loading}>
                 {loading ? <span className="spin" /> : editItem !== null ? "Update" : "Add Subscription"}
               </button>
@@ -705,7 +841,7 @@ export default function App() {
         </div>
       )}
 
-      {toast && <Toast msg={toast} onDone={()=>setToast(null)} />}
+      {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
     </>
   );
 }
