@@ -19,13 +19,13 @@ const CURRENCIES = ["INR", "USD", "EUR", "GBP", "CAD", "AUD"];
 const BILLING_CYCLES = ["Monthly", "Yearly", "Weekly", "Quarterly"];
 
 const CATEGORY_COLORS = {
-  Design: "#FF6B6B",
-  "Social Media": "#A78BFA",
-  BD: "#34D399",
-  Tech: "#60A5FA",
-  Ops: "#FBBF24",
-  SEO: "#52dc17",
-  Other: "#94969e",
+  Design: "#F43F5E",     
+  "Social Media": "#8B5CF6", 
+  BD: "#22C55E",          
+  Tech: "#3B82F6",        
+  Ops: "#F59E0B",     
+  SEO: "#14B8A6",          
+  Other: "#6B7280",        
 };
 const CATEGORY_ICONS = {
   Design: "🎨",
