@@ -24,7 +24,7 @@ const CATEGORY_COLORS = {
   BD: "#34D399",
   Tech: "#60A5FA",
   Ops: "#FBBF24",
-  SEO: "#2d382c",
+  SEO: "#52dc17",
   Other: "#94969e",
 };
 const CATEGORY_ICONS = {
