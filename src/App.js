@@ -6,6 +6,9 @@ const SHEET_ID = "18qPN8GXUvlJvW2STFFnj6vmKxPgD8vuqjtish7CdTQw";
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 const RANGE = "Subscriptions!A2:K";
 
+const SESSION_KEY = "subtrackr_google_session";
+const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 1 day
+
 const CATEGORIES = [
   "Design",
   "Social Media",
@@ -19,14 +22,15 @@ const CURRENCIES = ["INR", "USD", "EUR", "GBP", "CAD", "AUD"];
 const BILLING_CYCLES = ["Monthly", "Yearly", "Weekly", "Quarterly"];
 
 const CATEGORY_COLORS = {
-  Design: "#F43F5E",     
-  "Social Media": "#8B5CF6", 
-  BD: "#22C55E",          
-  Tech: "#3B82F6",        
-  Ops: "#F59E0B",     
-  SEO: "#14B8A6",          
-  Other: "#6B7280",        
+  Design: "#F43F5E",
+  "Social Media": "#8B5CF6",
+  BD: "#22C55E",
+  Tech: "#3B82F6",
+  Ops: "#F59E0B",
+  SEO: "#14B8A6",
+  Other: "#6B7280",
 };
+
 const CATEGORY_ICONS = {
   Design: "🎨",
   "Social Media": "📱",
@@ -36,6 +40,7 @@ const CATEGORY_ICONS = {
   SEO: "🔍",
   Other: "❓",
 };
+
 const CURRENCY_SYMBOLS = {
   USD: "$",
   EUR: "€",
@@ -44,6 +49,7 @@ const CURRENCY_SYMBOLS = {
   CAD: "C$",
   AUD: "A$",
 };
+
 const sym = (c) => CURRENCY_SYMBOLS[c] || c;
 
 async function fetchRatesToINR() {
@@ -54,15 +60,20 @@ async function fetchRatesToINR() {
   const data = await res.json();
   const toINR = { INR: 1 };
   for (const cur of ["USD", "EUR", "GBP", "CAD", "AUD"]) {
-    if (data.rates[cur])
+    if (data.rates[cur]) {
       toINR[cur] = parseFloat((1 / data.rates[cur]).toFixed(4));
+    }
   }
   const now = new Date();
-  const date = `${now.getDate().toString().padStart(2, "0")}-${(now.getMonth() + 1).toString().padStart(2, "0")}-${now.getFullYear()} ${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+  const date = `${now.getDate().toString().padStart(2, "0")}-${(now.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}-${now.getFullYear()} ${now
+    .getHours()
+    .toString()
+    .padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
   return { rates: toINR, date };
 }
 
-// ── Excel export (no library needed — generates real XLSX via CSV fallback as .xls which Excel opens natively)
 function exportToExcel(subs, rates) {
   const headers = [
     "Name",
@@ -78,6 +89,7 @@ function exportToExcel(subs, rates) {
     "Invoice Link",
     "Monthly Cost (INR)",
   ];
+
   const toMonthlyINR = (sub) => {
     const r = rates || {};
     const inr = sub.amount * (r[sub.currency] ?? 1);
@@ -86,6 +98,7 @@ function exportToExcel(subs, rates) {
     if (sub.billingCycle === "Quarterly") return inr / 3;
     return inr;
   };
+
   const rows = subs.map((s) => [
     s.name,
     s.category,
@@ -101,14 +114,26 @@ function exportToExcel(subs, rates) {
     toMonthlyINR(s).toFixed(2),
   ]);
 
-  // Build HTML table — Excel opens this perfectly as .xls
   let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
 <head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Subscriptions</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
 <body><table border="1">`;
-  html += `<tr>${headers.map((h) => `<th style="background:#1A1916;color:#fff;font-weight:bold;padding:8px 12px;">${h}</th>`).join("")}</tr>`;
+
+  html += `<tr>${headers
+    .map(
+      (h) =>
+        `<th style="background:#1A1916;color:#fff;font-weight:bold;padding:8px 12px;">${h}</th>`,
+    )
+    .join("")}</tr>`;
+
   rows.forEach((row, ri) => {
-    html += `<tr>${row.map((cell) => `<td style="padding:6px 12px;background:${ri % 2 === 0 ? "#FAFAF8" : "#fff"}">${cell ?? ""}</td>`).join("")}</tr>`;
+    html += `<tr>${row
+      .map(
+        (cell) =>
+          `<td style="padding:6px 12px;background:${ri % 2 === 0 ? "#FAFAF8" : "#fff"}">${cell ?? ""}</td>`,
+      )
+      .join("")}</tr>`;
   });
+
   html += `</table></body></html>`;
 
   const blob = new Blob([html], {
@@ -140,7 +165,6 @@ const css = `
   body { background: var(--bg); color: var(--text); font-family: var(--font-body); min-height: 100vh; -webkit-font-smoothing: antialiased; }
   .app { max-width: 1160px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; }
 
-  /* HEADER */
   .hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 1rem; }
   .logo-wrap { display: flex; align-items: center; gap: 0.75rem; }
   .logo-mark { width: 40px; height: 40px; background: var(--accent); border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; box-shadow: 0 4px 12px rgba(232,87,42,0.3); }
@@ -148,17 +172,11 @@ const css = `
   .logo span { color: var(--accent); }
   .hdr-right { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 
-  /* RATES BAR */
   .rates-bar { display: inline-flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; font-weight: 500; color: var(--text3); background: var(--surface2); border: 1.5px solid var(--border); border-radius: 99px; padding: 0.28rem 0.75rem; margin-bottom: 2rem; letter-spacing: 0.01em; flex-wrap: wrap; }
   .rates-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
   .rates-dot-live { background: #2D9B6F; } .rates-dot-loading { background: #D4A017; animation: rpulse 1s infinite; } .rates-dot-error { background: #E8572A; }
   @keyframes rpulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-  /* SILENT AUTH BANNER */
-  .auth-banner { display: flex; align-items: center; gap: 0.6rem; background: #EFF6FF; border: 1.5px solid #BFDBFE; border-radius: 10px; padding: 0.6rem 1rem; margin-bottom: 1.2rem; font-size: 0.78rem; color: #1D4ED8; font-weight: 500; }
-  .auth-banner-dot { width: 7px; height: 7px; border-radius: 50%; background: #3B82F6; animation: rpulse 1.2s infinite; flex-shrink: 0; }
-
-  /* BUTTONS */
   .btn { font-family: var(--font-body); font-size: 0.875rem; font-weight: 600; border: none; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.18s cubic-bezier(0.2,0,0,1); padding: 0.6rem 1.1rem; letter-spacing: -0.01em; }
   .btn-primary { background: var(--text); color: #fff; }
   .btn-primary:hover { background: #2d2b28; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(26,25,22,0.25); }
@@ -173,7 +191,6 @@ const css = `
   .btn-sm { padding: 0.45rem 0.85rem; font-size: 0.8rem; }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
-  /* STATS */
   .sgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
   @media(max-width:900px){ .sgrid { grid-template-columns: repeat(2,1fr); } }
   @media(max-width:500px){ .sgrid { grid-template-columns: 1fr; } }
@@ -186,7 +203,6 @@ const css = `
   .ssub { font-size: 0.73rem; color: var(--text3); margin-top: 0.45rem; }
   .scard-bg { position: absolute; right: -10px; top: -10px; font-size: 3.5rem; opacity: 0.05; line-height: 1; pointer-events: none; }
 
-  /* CHARTS */
   .crow { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem; }
   @media(max-width:700px){ .crow { grid-template-columns: 1fr; } }
   .card { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow-sm); }
@@ -211,7 +227,6 @@ const css = `
   .badge { font-size: 0.65rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 99px; letter-spacing: 0.04em; }
   .badge-warn { background: #FEF3C7; color: #D97706; } .badge-ok { background: #D1FAE5; color: #059669; } .badge-danger { background: #FEE2E2; color: #DC2626; }
 
-  /* TABLE */
   .twrap { background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
   .thdr { display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 1.5rem; border-bottom: 1.5px solid var(--border); background: var(--surface2); flex-wrap: wrap; gap: 0.6rem; }
   .thdr-title { font-family: var(--font-display); font-weight: 700; font-size: 0.95rem; }
@@ -230,14 +245,8 @@ const css = `
   .ibtn:hover { background: var(--surface2); color: var(--text); }
   .link-cell { color: #2563EB; text-decoration: none; font-size: 0.78rem; font-weight: 500; display: inline-flex; align-items: center; gap: 0.25rem; }
   .link-cell:hover { text-decoration: underline; }
-  /* password mask */
-  .pwd-cell { display: flex; align-items: center; gap: 0.4rem; }
-  .pwd-text { font-family: monospace; font-size: 0.82rem; letter-spacing: 0.05em; }
-  .pwd-toggle { background: none; border: none; cursor: pointer; font-size: 0.8rem; color: var(--text3); padding: 0.1rem 0.25rem; border-radius: 4px; transition: background 0.12s; }
-  .pwd-toggle:hover { background: var(--border); }
   @media(max-width:700px){ th, td { padding: 0.7rem 0.9rem; } .hide-mobile { display: none; } }
 
-  /* MODAL */
   .ov { position: fixed; inset: 0; background: rgba(26,25,22,0.55); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100; padding: 1rem; animation: fadeIn 0.2s ease; overflow-y: auto; }
   @keyframes fadeIn { from{opacity:0} to{opacity:1} }
   .modal { background: var(--surface); border: 1.5px solid var(--border); border-radius: 20px; padding: 2rem; width: 100%; max-width: 520px; box-shadow: var(--shadow-lg); animation: slideUp 0.25s cubic-bezier(0.16,1,0.3,1); margin: auto; }
@@ -260,7 +269,6 @@ const css = `
   .optional-tag { font-size: 0.62rem; font-weight: 500; color: var(--text3); text-transform: none; letter-spacing: 0; margin-left: 0.3rem; }
   .drive-hint { font-size: 0.72rem; color: var(--text3); margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; }
 
-  /* LOGIN */
   .lscreen { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg); padding: 1rem; }
   .lcard { background: var(--surface); border: 1.5px solid var(--border); border-radius: 24px; padding: 3rem 2.5rem; text-align: center; max-width: 380px; width: 100%; box-shadow: var(--shadow-lg); }
   .l-icon-wrap { width: 72px; height: 72px; background: var(--accent); border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 1.8rem; margin: 0 auto 1.5rem; box-shadow: 0 8px 24px rgba(232,87,42,0.35); }
@@ -275,7 +283,6 @@ const css = `
   .gbtn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
   .silent-status { font-size: 0.75rem; color: var(--text3); display: flex; align-items: center; gap: 0.5rem; justify-content: center; margin-top: 0.8rem; }
 
-  /* MISC */
   .empty { text-align: center; padding: 3rem 1.5rem; color: var(--text3); }
   .eicon { font-size: 2.5rem; margin-bottom: 0.75rem; }
   .empty p { font-size: 0.875rem; }
@@ -295,41 +302,40 @@ function Toast({ msg, onDone }) {
     const t = setTimeout(onDone, 3000);
     return () => clearTimeout(t);
   }, [onDone]);
+
   return <div className="toast">{msg}</div>;
 }
 
 function DonutChart({ data }) {
   const total = data.reduce((s, d) => s + d.inr, 0);
-  if (!total)
+
+  if (!total) {
     return (
       <div className="empty">
         <div className="eicon">📊</div>
         <p>No data yet</p>
       </div>
     );
+  }
+
   let cum = 0;
   const R = 52,
     cx = 68,
     cy = 68,
     C = 2 * Math.PI * R,
     gap = 0.015;
+
   const fmt = (n) =>
     n >= 100000
       ? `₹${(n / 100000).toFixed(1)}L`
       : n >= 1000
         ? `₹${(n / 1000).toFixed(1)}K`
         : `₹${n.toFixed(0)}`;
+
   return (
     <div className="donut-wrap">
       <svg width="136" height="136" style={{ flexShrink: 0 }}>
-        <circle
-          cx={cx}
-          cy={cy}
-          r={R}
-          fill="none"
-          stroke="#F4F3EF"
-          strokeWidth={20}
-        />
+        <circle cx={cx} cy={cy} r={R} fill="none" stroke="#F4F3EF" strokeWidth={20} />
         {data.map((d, i) => {
           const pct = d.inr / total;
           const dash = Math.max(0, pct - gap) * C;
@@ -379,16 +385,13 @@ function DonutChart({ data }) {
           {fmt(total)}
         </text>
       </svg>
+
       <div className="donut-legend">
         {data.map((d, i) => (
           <div className="legend-row" key={i}>
             <span className="legend-dot" style={{ background: d.color }} />
-            <span style={{ fontSize: "0.8rem", fontWeight: 500 }}>
-              {d.label}
-            </span>
-            <span className="legend-pct">
-              {((d.inr / total) * 100).toFixed(0)}%
-            </span>
+            <span style={{ fontSize: "0.8rem", fontWeight: 500 }}>{d.label}</span>
+            <span className="legend-pct">{((d.inr / total) * 100).toFixed(0)}%</span>
           </div>
         ))}
       </div>
@@ -414,8 +417,6 @@ export default function App() {
   const [gapiReady, setGapiReady] = useState(false);
   const [gsiReady, setGsiReady] = useState(false);
   const [signedIn, setSignedIn] = useState(false);
-  const [silentTrying, setSilentTrying] = useState(true); // attempting silent auth on load
-  const [subs, setSubs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -427,10 +428,73 @@ export default function App() {
   const [ratesError, setRatesError] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [restoringSession, setRestoringSession] = useState(true);
+
   const tokenRef = useRef(null);
+  const restoredOnceRef = useRef(false);
   const showToast = useCallback((msg) => setToast(msg), []);
 
-  // Live exchange rates
+  const saveSessionToStorage = useCallback((resp) => {
+    if (!resp?.access_token) return;
+
+    const now = Date.now();
+    const expiresInMs = (resp.expires_in || 3600) * 1000;
+
+    const session = {
+      access_token: resp.access_token,
+      expires_at: now + expiresInMs,
+      created_at: now,
+      token_type: resp.token_type || "Bearer",
+      scope: resp.scope || SCOPES,
+    };
+
+    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  }, []);
+
+  const clearStoredSession = useCallback(() => {
+    localStorage.removeItem(SESSION_KEY);
+  }, []);
+
+  const restoreSessionFromStorage = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(SESSION_KEY);
+      if (!raw) return false;
+
+      const saved = JSON.parse(raw);
+      const now = Date.now();
+
+      if (!saved?.access_token || !saved?.expires_at || !saved?.created_at) {
+        clearStoredSession();
+        return false;
+      }
+
+      if (now - saved.created_at > SESSION_MAX_AGE) {
+        clearStoredSession();
+        return false;
+      }
+
+      if (now >= saved.expires_at) {
+        clearStoredSession();
+        return false;
+      }
+
+      if (!window?.gapi?.client) return false;
+
+      window.gapi.client.setToken({
+        access_token: saved.access_token,
+        token_type: saved.token_type || "Bearer",
+        scope: saved.scope || SCOPES,
+        expires_in: Math.max(1, Math.floor((saved.expires_at - now) / 1000)),
+      });
+
+      setSignedIn(true);
+      return true;
+    } catch {
+      clearStoredSession();
+      return false;
+    }
+  }, [clearStoredSession]);
+
   useEffect(() => {
     fetchRatesToINR()
       .then(({ rates: r, date }) => {
@@ -465,36 +529,17 @@ export default function App() {
     return `₹${n.toFixed(2)}`;
   };
 
-  // ── Silent re-auth helper ────────────────────────────────────────────────
-  // Called once both GAPI + GSI are loaded. Uses prompt:"none" — no popup ever.
-  // If user previously granted access, Google returns a token silently.
-  const attemptSilentAuth = useCallback(() => {
-    if (!tokenRef.current) return;
-    tokenRef.current.requestAccessToken({ prompt: "none" });
-    // setSilentTrying stays true until callback fires (success or error)
-    // We give it a 5s timeout, then let the user click manually
-    setTimeout(() => setSilentTrying(false), 5000);
+  const markReady = useCallback((which) => {
+    setStatus(`${which} ready`);
+    if (which === "GAPI") window.__subtrackr_gapi = true;
+    if (which === "GSI") window.__subtrackr_gsi = true;
   }, []);
 
-  // Track when both scripts are ready so we can attempt silent auth once
-  const markReady = useCallback(
-    (which) => {
-      setStatus(`${which} ready`);
-      // We use a module-level flag to avoid stale closure issues
-      if (which === "GAPI") window.__subtrackr_gapi = true;
-      if (which === "GSI") window.__subtrackr_gsi = true;
-      if (window.__subtrackr_gapi && window.__subtrackr_gsi) {
-        attemptSilentAuth();
-      }
-    },
-    [attemptSilentAuth],
-  );
-
-  // Load GAPI
   useEffect(() => {
     const s = document.createElement("script");
     s.src = "https://apis.google.com/js/api.js";
     s.async = true;
+
     s.onload = () => {
       window.gapi.load("client", async () => {
         try {
@@ -509,75 +554,94 @@ export default function App() {
           setInitError(
             "Google Sheets API failed to initialise. Make sure your origin is listed under Authorised JavaScript Origins in Google Cloud Console.",
           );
-          setSilentTrying(false);
+          setRestoringSession(false);
         }
       });
     };
+
     s.onerror = () => {
-      setInitError(
-        "Failed to load Google APIs – check your internet connection.",
-      );
-      setSilentTrying(false);
+      setInitError("Failed to load Google APIs – check your internet connection.");
+      setRestoringSession(false);
     };
+
     document.body.appendChild(s);
   }, [markReady]);
 
-  // Load GSI
   useEffect(() => {
     const s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client";
     s.async = true;
+
     s.onload = () => {
       try {
         tokenRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: CLIENT_ID,
           scope: SCOPES,
           callback: (resp) => {
-            setSilentTrying(false);
             if (resp.error) {
-              // "access_denied" or "interaction_required" = silent auth failed, need manual click
-              if (
-                resp.error !== "interaction_required" &&
-                resp.error !== "access_denied"
-              ) {
-                showToast("❌ Sign-in error: " + resp.error);
-              }
+              showToast("❌ Sign-in error: " + resp.error);
               return;
             }
+
+            if (resp.access_token) {
+              window.gapi.client.setToken({
+                access_token: resp.access_token,
+                token_type: resp.token_type || "Bearer",
+                scope: resp.scope || SCOPES,
+                expires_in: resp.expires_in || 3600,
+              });
+              saveSessionToStorage(resp);
+            }
+
             setSignedIn(true);
           },
-          // Re-authenticate silently every 50 minutes (token lasts 60 min)
-          // by listening for token expiry implicitly — handled via auto re-request before calls
         });
+
         setGsiReady(true);
         markReady("GSI");
       } catch {
-        setInitError(
-          "Google Sign-In failed to initialise. Check your Client ID.",
-        );
-        setSilentTrying(false);
+        setInitError("Google Sign-In failed to initialise. Check your Client ID.");
+        setRestoringSession(false);
       }
     };
+
     s.onerror = () => {
       setInitError("Failed to load Google Sign-In script.");
-      setSilentTrying(false);
+      setRestoringSession(false);
     };
-    document.body.appendChild(s);
-  }, [markReady, showToast]);
 
-  // ── Auto-refresh token every 50 minutes to keep session alive ────────────
+    document.body.appendChild(s);
+  }, [markReady, saveSessionToStorage, showToast]);
+
   useEffect(() => {
-    if (!signedIn) return;
-    const interval = setInterval(
-      () => {
-        if (tokenRef.current) {
-          tokenRef.current.requestAccessToken({ prompt: "none" });
+    if (!gapiReady || !gsiReady || restoredOnceRef.current) return;
+
+    restoredOnceRef.current = true;
+    const restored = restoreSessionFromStorage();
+
+    if (!restored) {
+      setRestoringSession(false);
+    } else {
+      setRestoringSession(false);
+    }
+  }, [gapiReady, gsiReady, restoreSessionFromStorage]);
+
+  const handleAuthError = useCallback(
+    (err) => {
+      const code = err?.status || err?.result?.error?.code;
+      if (code === 401 || code === 403) {
+        clearStoredSession();
+        setSignedIn(false);
+        if (window?.gapi?.client) {
+          window.gapi.client.setToken(null);
         }
-      },
-      50 * 60 * 1000,
-    ); // 50 minutes
-    return () => clearInterval(interval);
-  }, [signedIn]);
+        showToast("🔐 Session expired. Please sign in again.");
+        return true;
+      }
+      return false;
+    },
+    [clearStoredSession, showToast],
+  );
 
   const fetchSubs = useCallback(async () => {
     setLoading(true);
@@ -586,6 +650,7 @@ export default function App() {
         spreadsheetId: SHEET_ID,
         range: RANGE,
       });
+
       const rows = res.result.values || [];
       setSubs(
         rows.map((r, i) => ({
@@ -603,11 +668,15 @@ export default function App() {
           invoiceLink: r[10] || "",
         })),
       );
-    } catch {
-      showToast("❌ Could not load data from Google Sheets");
+    } catch (err) {
+      if (!handleAuthError(err)) {
+        showToast("❌ Could not load data from Google Sheets");
+      }
     }
     setLoading(false);
-  }, [showToast]);
+  }, [handleAuthError, showToast]);
+
+  const [subs, setSubs] = useState([]);
 
   useEffect(() => {
     if (signedIn) fetchSubs();
@@ -618,15 +687,18 @@ export default function App() {
       showToast("⏳ Still loading...");
       return;
     }
-    tokenRef.current.requestAccessToken({ prompt: "" });
+    tokenRef.current.requestAccessToken({ prompt: "consent" });
   };
 
   const signOut = () => {
-    const token = window.gapi.client.getToken();
-    if (token) {
+    const token = window?.gapi?.client?.getToken?.();
+    if (token?.access_token && window?.google?.accounts?.oauth2) {
       window.google.accounts.oauth2.revoke(token.access_token, () => {});
+    }
+    if (window?.gapi?.client) {
       window.gapi.client.setToken(null);
     }
+    clearStoredSession();
     setSignedIn(false);
     setSubs([]);
     showToast("👋 Signed out");
@@ -638,6 +710,7 @@ export default function App() {
     setShowPwd(false);
     setShowModal(true);
   };
+
   const openEdit = (sub) => {
     setEditItem(sub);
     setForm({
@@ -672,11 +745,14 @@ export default function App() {
   ];
 
   const saveSub = async () => {
-    if (!form.name.trim() || !form.amount)
+    if (!form.name.trim() || !form.amount) {
       return showToast("⚠️ Name and amount are required");
+    }
+
     setLoading(true);
     try {
       const row = rowFromForm();
+
       if (editItem !== null) {
         await window.gapi.client.sheets.spreadsheets.values.update({
           spreadsheetId: SHEET_ID,
@@ -694,24 +770,32 @@ export default function App() {
         });
         showToast("✅ Added!");
       }
+
       setShowModal(false);
       fetchSubs();
-    } catch {
-      showToast(
-        "❌ Save failed – check the sheet tab is named 'Subscriptions'",
-      );
+    } catch (err) {
+      if (!handleAuthError(err)) {
+        showToast("❌ Save failed – check the sheet tab is named 'Subscriptions'");
+      }
     }
     setLoading(false);
   };
 
   const deleteSub = async (sub) => {
     if (!window.confirm(`Delete "${sub.name}"?`)) return;
+
     setLoading(true);
     try {
       const meta = await window.gapi.client.sheets.spreadsheets.get({
         spreadsheetId: SHEET_ID,
       });
-      const sheetId = meta.result.sheets[0].properties.sheetId;
+
+      const targetSheet = meta.result.sheets.find(
+        (s) => s.properties.title === "Subscriptions",
+      );
+      const sheetId =
+        targetSheet?.properties?.sheetId ?? meta.result.sheets[0].properties.sheetId;
+
       await window.gapi.client.sheets.spreadsheets.batchUpdate({
         spreadsheetId: SHEET_ID,
         resource: {
@@ -729,15 +813,17 @@ export default function App() {
           ],
         },
       });
+
       showToast("🗑️ Deleted");
       fetchSubs();
-    } catch {
-      showToast("❌ Delete failed");
+    } catch (err) {
+      if (!handleAuthError(err)) {
+        showToast("❌ Delete failed");
+      }
     }
     setLoading(false);
   };
 
-  // ── Analytics ─────────────────────────────────────────────────────────────
   const toMonthlyINR = (sub) => {
     const inr = convertToINR(sub.amount, sub.currency);
     if (sub.billingCycle === "Yearly") return inr / 12;
@@ -763,19 +849,15 @@ export default function App() {
     .slice(0, 5)
     .map((s) => ({
       ...s,
-      daysLeft: Math.ceil(
-        (new Date(s.nextBillingDate) - new Date()) / 86400000,
-      ),
+      daysLeft: Math.ceil((new Date(s.nextBillingDate) - new Date()) / 86400000),
     }));
 
   const isReady = gapiReady && gsiReady;
   const maxCat = Math.max(...catTotals.map((c) => c.inr), 1);
+
   const getBadgeClass = (d) =>
-    d <= 3
-      ? "badge badge-danger"
-      : d <= 7
-        ? "badge badge-warn"
-        : "badge badge-ok";
+    d <= 3 ? "badge badge-danger" : d <= 7 ? "badge badge-warn" : "badge badge-ok";
+
   const previewINR =
     form.amount && form.currency !== "INR" && rates
       ? convertToINR(parseFloat(form.amount) || 0, form.currency)
@@ -784,7 +866,6 @@ export default function App() {
   const setF = (key) => (e) =>
     setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  // ── Login screen ───────────────────────────────────────────────────────────
   if (!signedIn) {
     return (
       <>
@@ -799,6 +880,7 @@ export default function App() {
               Track every subscription in one place. All costs shown in ₹ with
               live exchange rates.
             </div>
+
             <div className="lfeatures">
               {[
                 ["📊", "Visual spend analytics by category"],
@@ -813,15 +895,12 @@ export default function App() {
                 </div>
               ))}
             </div>
+
             {initError ? (
               <div className="errbox">⚠️ {initError}</div>
             ) : (
               <>
-                <button
-                  className="gbtn"
-                  onClick={signIn}
-                  disabled={!isReady || silentTrying}
-                >
+                <button className="gbtn" onClick={signIn} disabled={!isReady || restoringSession}>
                   <svg width="18" height="18" viewBox="0 0 48 48">
                     <path
                       fill="#4285F4"
@@ -840,17 +919,18 @@ export default function App() {
                       d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.3-4.3 5.7l6.7 5.2C42.1 36.2 44.5 30.5 44.5 24c0-1.3-.2-2.7-.5-4z"
                     />
                   </svg>
-                  {silentTrying
-                    ? "Signing you in…"
+                  {restoringSession
+                    ? "Checking saved session..."
                     : isReady
                       ? "Continue with Google"
-                      : "Loading…"}
+                      : "Loading..."}
                 </button>
-                {(silentTrying || !isReady) && (
+
+                {(!isReady || restoringSession) && (
                   <div className="silent-status">
                     <div className="spin spin-dark" />
                     <span>
-                      {silentTrying ? "Attempting silent sign-in…" : status}
+                      {restoringSession ? "Restoring saved session..." : status}
                     </span>
                   </div>
                 )}
@@ -858,11 +938,12 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
       </>
     );
   }
 
-  // ── Dashboard ──────────────────────────────────────────────────────────────
   return (
     <>
       <style>{css}</style>
@@ -891,7 +972,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Silent auth reminder — shown briefly after token refresh */}
         <div className="rates-bar">
           <span
             className={`rates-dot ${!rates ? "rates-dot-loading" : ratesError ? "rates-dot-error" : "rates-dot-live"}`}
@@ -903,7 +983,6 @@ export default function App() {
               : `Live rates · fetched ${ratesDate} · 1 USD = ₹${rates.USD?.toFixed(2)} · 1 EUR = ₹${rates.EUR?.toFixed(2)} · 1 GBP = ₹${rates.GBP?.toFixed(2)} · 1 CAD = ₹${rates.CAD?.toFixed(2)} · 1 AUD = ₹${rates.AUD?.toFixed(2)}`}
         </div>
 
-        {/* Stats */}
         <div className="sgrid">
           {[
             {
@@ -946,6 +1025,7 @@ export default function App() {
             <div className="ctitle">Monthly Spend by Category (₹)</div>
             <DonutChart data={catTotals} />
           </div>
+
           <div className="card">
             <div className="ctitle">Category Breakdown (₹ / mo)</div>
             {catTotals.length === 0 ? (
@@ -992,16 +1072,8 @@ export default function App() {
                     <div className="uname">{s.name}</div>
                     <div className="udate">{s.nextBillingDate}</div>
                   </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                    }}
-                  >
-                    <span className={getBadgeClass(s.daysLeft)}>
-                      {s.daysLeft}d
-                    </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <span className={getBadgeClass(s.daysLeft)}>{s.daysLeft}d</span>
                     <div className="uamt-wrap">
                       <div className="uamt">
                         {fmtINR(convertToINR(s.amount, s.currency))}
@@ -1018,6 +1090,7 @@ export default function App() {
               ))
             )}
           </div>
+
           <div className="card">
             <div className="ctitle">Billing Cycle Split</div>
             {subs.length === 0 ? (
@@ -1027,9 +1100,7 @@ export default function App() {
               </div>
             ) : (
               BILLING_CYCLES.map((cycle) => {
-                const count = subs.filter(
-                  (s) => s.billingCycle === cycle,
-                ).length;
+                const count = subs.filter((s) => s.billingCycle === cycle).length;
                 return count > 0 ? (
                   <div className="brow" key={cycle}>
                     <span className="blabel">{cycle}</span>
@@ -1050,7 +1121,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Table */}
         <div className="twrap">
           <div className="thdr">
             <div className="thdr-title">
@@ -1069,6 +1139,7 @@ export default function App() {
               </button>
             </div>
           </div>
+
           {subs.length === 0 ? (
             <div className="empty">
               <div className="eicon">💳</div>
@@ -1131,13 +1202,7 @@ export default function App() {
                         {sub.nextBillingDate || "—"}
                       </td>
                       <td className="hide-mobile">
-                        <div
-                          style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "0.25rem",
-                          }}
-                        >
+                        <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
                           {sub.appLink && (
                             <a
                               href={sub.appLink}
@@ -1165,18 +1230,10 @@ export default function App() {
                       </td>
                       <td>
                         <div className="acts">
-                          <button
-                            className="ibtn"
-                            onClick={() => openEdit(sub)}
-                            title="Edit"
-                          >
+                          <button className="ibtn" onClick={() => openEdit(sub)} title="Edit">
                             ✏️
                           </button>
-                          <button
-                            className="ibtn"
-                            onClick={() => deleteSub(sub)}
-                            title="Delete"
-                          >
+                          <button className="ibtn" onClick={() => deleteSub(sub)} title="Delete">
                             🗑️
                           </button>
                         </div>
@@ -1190,22 +1247,16 @@ export default function App() {
         </div>
       </div>
 
-      {/* Modal */}
       {showModal && (
-        <div
-          className="ov"
-          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
-        >
+        <div className="ov" onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
             <div className="modal-title">
               {editItem !== null ? "Edit Subscription" : "Add Subscription"}
             </div>
-            <div className="modal-sub">
-              Fields marked optional can be filled later.
-            </div>
+            <div className="modal-sub">Fields marked optional can be filled later.</div>
 
-            {/* ── Basic Info ── */}
             <div className="section-divider">📋 Basic Info</div>
+
             <div className="fg">
               <label>Service Name</label>
               <input
@@ -1214,6 +1265,7 @@ export default function App() {
                 onChange={setF("name")}
               />
             </div>
+
             <div className="frow">
               <div className="fg">
                 <label>Amount</label>
@@ -1227,12 +1279,12 @@ export default function App() {
                   <div className="preview-inr">
                     ≈ <strong>{fmtINR(previewINR)}</strong>
                     <span style={{ color: "var(--text3)" }}>
-                      · 1 {form.currency} = ₹
-                      {rates?.[form.currency]?.toFixed(2)}
+                      · 1 {form.currency} = ₹{rates?.[form.currency]?.toFixed(2)}
                     </span>
                   </div>
                 )}
               </div>
+
               <div className="fg">
                 <label>Currency</label>
                 <select value={form.currency} onChange={setF("currency")}>
@@ -1244,6 +1296,7 @@ export default function App() {
                 </select>
               </div>
             </div>
+
             <div className="frow">
               <div className="fg">
                 <label>Category</label>
@@ -1253,18 +1306,17 @@ export default function App() {
                   ))}
                 </select>
               </div>
+
               <div className="fg">
                 <label>Billing Cycle</label>
-                <select
-                  value={form.billingCycle}
-                  onChange={setF("billingCycle")}
-                >
+                <select value={form.billingCycle} onChange={setF("billingCycle")}>
                   {BILLING_CYCLES.map((c) => (
                     <option key={c}>{c}</option>
                   ))}
                 </select>
               </div>
             </div>
+
             <div className="fg">
               <label>Next Billing Date</label>
               <div className="date-wrap">
@@ -1282,10 +1334,10 @@ export default function App() {
               </div>
             </div>
 
-            {/* ── Credentials ── */}
             <div className="section-divider">
               🔑 Credentials <span className="optional-tag">(optional)</span>
             </div>
+
             <div className="frow">
               <div className="fg">
                 <label>Email ID</label>
@@ -1296,6 +1348,7 @@ export default function App() {
                   onChange={setF("emailId")}
                 />
               </div>
+
               <div className="fg">
                 <label>User ID / Username</label>
                 <input
@@ -1305,6 +1358,7 @@ export default function App() {
                 />
               </div>
             </div>
+
             <div className="fg">
               <label>Password</label>
               <div className="pwd-input-wrap">
@@ -1314,20 +1368,16 @@ export default function App() {
                   value={form.password}
                   onChange={setF("password")}
                 />
-                <button
-                  className="pwd-eye"
-                  onClick={() => setShowPwd((s) => !s)}
-                  type="button"
-                >
+                <button className="pwd-eye" onClick={() => setShowPwd((s) => !s)} type="button">
                   {showPwd ? "🙈" : "👁️"}
                 </button>
               </div>
             </div>
 
-            {/* ── Links ── */}
             <div className="section-divider">
               🔗 Links <span className="optional-tag">(optional)</span>
             </div>
+
             <div className="fg">
               <label>App Link</label>
               <input
@@ -1337,14 +1387,12 @@ export default function App() {
                 onChange={setF("appLink")}
               />
             </div>
+
             <div className="fg">
               <label>
-                Invoice Link{" "}
-                <span className="optional-tag">Google Drive / any URL</span>
+                Invoice Link <span className="optional-tag">Google Drive / any URL</span>
               </label>
-              <div
-                style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
-              >
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
                 <input
                   type="url"
                   placeholder="https://drive.google.com/file/d/…"
@@ -1368,31 +1416,18 @@ export default function App() {
                   📂 Open Drive
                 </a>
               </div>
+
               <div className="drive-hint">
-                💡 Upload invoice to Drive → right-click → Copy link → paste
-                here
+                💡 Upload invoice to Drive → right-click → Copy link → paste here
               </div>
             </div>
 
             <div className="macts">
-              <button
-                className="btn btn-ghost"
-                onClick={() => setShowModal(false)}
-              >
+              <button className="btn btn-ghost" onClick={() => setShowModal(false)}>
                 Cancel
               </button>
-              <button
-                className="btn btn-accent"
-                onClick={saveSub}
-                disabled={loading}
-              >
-                {loading ? (
-                  <span className="spin" />
-                ) : editItem !== null ? (
-                  "Update"
-                ) : (
-                  "Add Subscription"
-                )}
+              <button className="btn btn-accent" onClick={saveSub} disabled={loading}>
+                {loading ? <span className="spin" /> : editItem !== null ? "Update" : "Add Subscription"}
               </button>
             </div>
           </div>
