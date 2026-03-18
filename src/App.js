@@ -7,89 +7,42 @@ const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
 const RANGE = "Subscriptions!A2:K";
 
 const SESSION_KEY = "subtrackr_google_session";
-const SESSION_MAX_AGE = 24 * 60 * 60 * 1000; // 1 day
+const SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
 
-const CATEGORIES = [
-  "Design",
-  "Social Media",
-  "BD",
-  "Tech",
-  "Ops",
-  "SEO",
-  "Other",
-];
+const CATEGORIES = ["Design","Social Media","BD","Tech","Ops","SEO","Other"];
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "CAD", "AUD"];
 const BILLING_CYCLES = ["Monthly", "Yearly", "Weekly", "Quarterly"];
 
 const CATEGORY_COLORS = {
-  Design: "#F43F5E",
-  "Social Media": "#8B5CF6",
-  BD: "#22C55E",
-  Tech: "#3B82F6",
-  Ops: "#F59E0B",
-  SEO: "#14B8A6",
-  Other: "#6B7280",
+  Design: "#F43F5E","Social Media": "#8B5CF6",BD: "#22C55E",Tech: "#3B82F6",
+  Ops: "#F59E0B",SEO: "#14B8A6",Other: "#6B7280",
 };
 
 const CATEGORY_ICONS = {
-  Design: "🎨",
-  "Social Media": "📱",
-  BD: "💼",
-  Tech: "💻",
-  Ops: "⚙️",
-  SEO: "🔍",
-  Other: "❓",
+  Design: "🎨","Social Media": "📱",BD: "💼",Tech: "💻",Ops: "⚙️",SEO: "🔍",Other: "❓",
 };
 
 const CURRENCY_SYMBOLS = {
-  USD: "$",
-  EUR: "€",
-  GBP: "£",
-  INR: "₹",
-  CAD: "C$",
-  AUD: "A$",
+  USD: "$",EUR: "€",GBP: "£",INR: "₹",CAD: "C$",AUD: "A$",
 };
 
 const sym = (c) => CURRENCY_SYMBOLS[c] || c;
 
 async function fetchRatesToINR() {
-  const res = await fetch("https://open.er-api.com/v6/latest/INR", {
-    cache: "no-store",
-  });
+  const res = await fetch("https://open.er-api.com/v6/latest/INR", { cache: "no-store" });
   if (!res.ok) throw new Error(`ExchangeRate-API HTTP ${res.status}`);
   const data = await res.json();
   const toINR = { INR: 1 };
   for (const cur of ["USD", "EUR", "GBP", "CAD", "AUD"]) {
-    if (data.rates[cur]) {
-      toINR[cur] = parseFloat((1 / data.rates[cur]).toFixed(4));
-    }
+    if (data.rates[cur]) toINR[cur] = parseFloat((1 / data.rates[cur]).toFixed(4));
   }
   const now = new Date();
-  const date = `${now.getDate().toString().padStart(2, "0")}-${(now.getMonth() + 1)
-    .toString()
-    .padStart(2, "0")}-${now.getFullYear()} ${now
-    .getHours()
-    .toString()
-    .padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}`;
+  const date = `${now.getDate().toString().padStart(2,"0")}-${(now.getMonth()+1).toString().padStart(2,"0")}-${now.getFullYear()} ${now.getHours().toString().padStart(2,"0")}:${now.getMinutes().toString().padStart(2,"0")}`;
   return { rates: toINR, date };
 }
 
 function exportToExcel(subs, rates) {
-  const headers = [
-    "Name",
-    "Category",
-    "Amount",
-    "Currency",
-    "Billing Cycle",
-    "Next Billing Date",
-    "Email ID",
-    "User ID",
-    "Password",
-    "App Link",
-    "Invoice Link",
-    "Monthly Cost (INR)",
-  ];
-
+  const headers = ["Name","Category","Amount","Currency","Billing Cycle","Next Billing Date","Email ID","User ID","Password","App Link","Invoice Link","Monthly Cost (INR)"];
   const toMonthlyINR = (sub) => {
     const r = rates || {};
     const inr = sub.amount * (r[sub.currency] ?? 1);
@@ -98,51 +51,16 @@ function exportToExcel(subs, rates) {
     if (sub.billingCycle === "Quarterly") return inr / 3;
     return inr;
   };
-
-  const rows = subs.map((s) => [
-    s.name,
-    s.category,
-    s.amount,
-    s.currency,
-    s.billingCycle,
-    s.nextBillingDate,
-    s.emailId,
-    s.userId,
-    s.password,
-    s.appLink,
-    s.invoiceLink,
-    toMonthlyINR(s).toFixed(2),
-  ]);
-
-  let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-<head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Subscriptions</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head>
-<body><table border="1">`;
-
-  html += `<tr>${headers
-    .map(
-      (h) =>
-        `<th style="background:#1A1916;color:#fff;font-weight:bold;padding:8px 12px;">${h}</th>`,
-    )
-    .join("")}</tr>`;
-
-  rows.forEach((row, ri) => {
-    html += `<tr>${row
-      .map(
-        (cell) =>
-          `<td style="padding:6px 12px;background:${ri % 2 === 0 ? "#FAFAF8" : "#fff"}">${cell ?? ""}</td>`,
-      )
-      .join("")}</tr>`;
-  });
-
+  const rows = subs.map((s) => [s.name,s.category,s.amount,s.currency,s.billingCycle,s.nextBillingDate,s.emailId,s.userId,s.password,s.appLink,s.invoiceLink,toMonthlyINR(s).toFixed(2)]);
+  let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Subscriptions</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">`;
+  html += `<tr>${headers.map((h) => `<th style="background:#1A1916;color:#fff;font-weight:bold;padding:8px 12px;">${h}</th>`).join("")}</tr>`;
+  rows.forEach((row, ri) => { html += `<tr>${row.map((cell) => `<td style="padding:6px 12px;background:${ri % 2 === 0 ? "#FAFAF8" : "#fff"}">${cell ?? ""}</td>`).join("")}</tr>`; });
   html += `</table></body></html>`;
-
-  const blob = new Blob([html], {
-    type: "application/vnd.ms-excel;charset=utf-8",
-  });
+  const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `SubTrackr_Export_${new Date().toISOString().slice(0, 10)}.xls`;
+  a.download = `SubTrackr_Export_${new Date().toISOString().slice(0,10)}.xls`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -191,6 +109,32 @@ const css = `
   .btn-sm { padding: 0.45rem 0.85rem; font-size: 0.8rem; }
   .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
 
+  /* ── Exact Mode Toggle ── */
+  .exact-toggle {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: 99px; padding: 0.35rem 0.85rem;
+    cursor: pointer; font-family: var(--font-body); font-size: 0.78rem;
+    font-weight: 600; color: var(--text2); transition: all 0.18s ease;
+    white-space: nowrap;
+  }
+  .exact-toggle:hover { border-color: var(--border2); color: var(--text); background: var(--border); }
+  .exact-toggle.active {
+    background: #EFF6FF; border-color: #93C5FD; color: #1D4ED8;
+  }
+  .exact-toggle.active:hover { background: #DBEAFE; }
+  .toggle-pill {
+    width: 28px; height: 16px; border-radius: 99px; background: var(--border2);
+    position: relative; transition: background 0.2s ease; flex-shrink: 0;
+  }
+  .exact-toggle.active .toggle-pill { background: #3B82F6; }
+  .toggle-knob {
+    position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+    border-radius: 50%; background: #fff; transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .exact-toggle.active .toggle-knob { transform: translateX(12px); }
+
   .sgrid { display: grid; grid-template-columns: repeat(4,1fr); gap: 1rem; margin-bottom: 1.5rem; }
   @media(max-width:900px){ .sgrid { grid-template-columns: repeat(2,1fr); } }
   @media(max-width:500px){ .sgrid { grid-template-columns: 1fr; } }
@@ -198,7 +142,7 @@ const css = `
   .scard:hover { box-shadow: var(--shadow); transform: translateY(-2px); }
   .scard-accent { border-color: var(--accent); }
   .slabel { font-size: 0.72rem; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; display: block; }
-  .sval { font-family: var(--font-display); font-size: 1.85rem; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: var(--text); }
+  .sval { font-family: var(--font-display); font-size: 1.85rem; font-weight: 800; line-height: 1; letter-spacing: -0.03em; color: var(--text); transition: all 0.2s ease; }
   .scard-accent .sval { color: var(--accent); }
   .ssub { font-size: 0.73rem; color: var(--text3); margin-top: 0.45rem; }
   .scard-bg { position: absolute; right: -10px; top: -10px; font-size: 3.5rem; opacity: 0.05; line-height: 1; pointer-events: none; }
@@ -302,11 +246,21 @@ function Toast({ msg, onDone }) {
     const t = setTimeout(onDone, 3000);
     return () => clearTimeout(t);
   }, [onDone]);
-
   return <div className="toast">{msg}</div>;
 }
 
-function DonutChart({ data }) {
+// ── Shared formatter: compact (default) or exact ──────────────────────────────
+function formatINR(n, exact) {
+  if (exact) {
+    return "₹" + n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
+  if (n >= 100000)   return `₹${(n / 100000).toFixed(2)}L`;
+  if (n >= 1000)     return `₹${(n / 1000).toFixed(1)}K`;
+  return `₹${n.toFixed(2)}`;
+}
+
+function DonutChart({ data, exact }) {
   const total = data.reduce((s, d) => s + d.inr, 0);
 
   if (!total) {
@@ -319,18 +273,18 @@ function DonutChart({ data }) {
   }
 
   let cum = 0;
-  const R = 52,
-    cx = 68,
-    cy = 68,
-    C = 2 * Math.PI * R,
-    gap = 0.015;
+  const R = 52, cx = 68, cy = 68, C = 2 * Math.PI * R, gap = 0.015;
 
-  const fmt = (n) =>
-    n >= 100000
-      ? `₹${(n / 100000).toFixed(1)}L`
-      : n >= 1000
-        ? `₹${(n / 1000).toFixed(1)}K`
-        : `₹${n.toFixed(0)}`;
+  const centerLabel = exact
+    ? "₹" + total.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+    : total >= 100000
+      ? `₹${(total / 100000).toFixed(1)}L`
+      : total >= 1000
+        ? `₹${(total / 1000).toFixed(1)}K`
+        : `₹${total.toFixed(0)}`;
+
+  // Shrink font size if exact number is long
+  const centerFontSize = exact && centerLabel.length > 9 ? 9 : exact && centerLabel.length > 7 ? 10 : 13;
 
   return (
     <div className="donut-wrap">
@@ -343,46 +297,21 @@ function DonutChart({ data }) {
           cum += pct;
           return (
             <circle
-              key={i}
-              cx={cx}
-              cy={cy}
-              r={R}
-              fill="none"
-              stroke={d.color}
-              strokeWidth={18}
+              key={i} cx={cx} cy={cy} r={R} fill="none"
+              stroke={d.color} strokeWidth={18}
               strokeDasharray={`${dash} ${C - dash}`}
-              strokeDashoffset={offset}
-              strokeLinecap="round"
-              style={{
-                transform: "rotate(-90deg)",
-                transformOrigin: "50% 50%",
-                transition: "stroke-dasharray 0.8s ease",
-              }}
+              strokeDashoffset={offset} strokeLinecap="round"
+              style={{ transform: "rotate(-90deg)", transformOrigin: "50% 50%", transition: "stroke-dasharray 0.8s ease" }}
             />
           );
         })}
-        <text
-          x={cx}
-          y={cy - 7}
-          textAnchor="middle"
-          fill="#9E9B94"
-          fontSize="9"
-          fontFamily="Space Grotesk"
-          fontWeight="600"
-          letterSpacing="1"
-        >
+        <text x={cx} y={cy - 7} textAnchor="middle" fill="#9E9B94" fontSize="9"
+          fontFamily="Space Grotesk" fontWeight="600" letterSpacing="1">
           TOTAL/MO
         </text>
-        <text
-          x={cx}
-          y={cy + 11}
-          textAnchor="middle"
-          fill="#1A1916"
-          fontSize="13"
-          fontWeight="800"
-          fontFamily="Plus Jakarta Sans"
-        >
-          {fmt(total)}
+        <text x={cx} y={cy + 11} textAnchor="middle" fill="#1A1916"
+          fontSize={centerFontSize} fontWeight="800" fontFamily="Plus Jakarta Sans">
+          {centerLabel}
         </text>
       </svg>
 
@@ -400,17 +329,9 @@ function DonutChart({ data }) {
 }
 
 const EMPTY_FORM = {
-  name: "",
-  category: "Design",
-  amount: "",
-  currency: "INR",
-  billingCycle: "Monthly",
-  nextBillingDate: "",
-  emailId: "",
-  userId: "",
-  password: "",
-  appLink: "",
-  invoiceLink: "",
+  name: "", category: "Design", amount: "", currency: "INR",
+  billingCycle: "Monthly", nextBillingDate: "", emailId: "",
+  userId: "", password: "", appLink: "", invoiceLink: "",
 };
 
 export default function App() {
@@ -429,6 +350,8 @@ export default function App() {
   const [showPwd, setShowPwd] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [restoringSession, setRestoringSession] = useState(true);
+  // ── NEW: exact number toggle (false = compact like 1.2K, true = exact like 1,230) ──
+  const [exactMode, setExactMode] = useState(false);
 
   const tokenRef = useRef(null);
   const restoredOnceRef = useRef(false);
@@ -436,10 +359,8 @@ export default function App() {
 
   const saveSessionToStorage = useCallback((resp) => {
     if (!resp?.access_token) return;
-
     const now = Date.now();
     const expiresInMs = (resp.expires_in || 3600) * 1000;
-
     const session = {
       access_token: resp.access_token,
       expires_at: now + expiresInMs,
@@ -447,7 +368,6 @@ export default function App() {
       token_type: resp.token_type || "Bearer",
       scope: resp.scope || SCOPES,
     };
-
     localStorage.setItem(SESSION_KEY, JSON.stringify(session));
   }, []);
 
@@ -459,34 +379,18 @@ export default function App() {
     try {
       const raw = localStorage.getItem(SESSION_KEY);
       if (!raw) return false;
-
       const saved = JSON.parse(raw);
       const now = Date.now();
-
-      if (!saved?.access_token || !saved?.expires_at || !saved?.created_at) {
-        clearStoredSession();
-        return false;
-      }
-
-      if (now - saved.created_at > SESSION_MAX_AGE) {
-        clearStoredSession();
-        return false;
-      }
-
-      if (now >= saved.expires_at) {
-        clearStoredSession();
-        return false;
-      }
-
+      if (!saved?.access_token || !saved?.expires_at || !saved?.created_at) { clearStoredSession(); return false; }
+      if (now - saved.created_at > SESSION_MAX_AGE) { clearStoredSession(); return false; }
+      if (now >= saved.expires_at) { clearStoredSession(); return false; }
       if (!window?.gapi?.client) return false;
-
       window.gapi.client.setToken({
         access_token: saved.access_token,
         token_type: saved.token_type || "Bearer",
         scope: saved.scope || SCOPES,
         expires_in: Math.max(1, Math.floor((saved.expires_at - now) / 1000)),
       });
-
       setSignedIn(true);
       return true;
     } catch {
@@ -497,37 +401,20 @@ export default function App() {
 
   useEffect(() => {
     fetchRatesToINR()
-      .then(({ rates: r, date }) => {
-        setRates(r);
-        setRatesDate(date);
-      })
+      .then(({ rates: r, date }) => { setRates(r); setRatesDate(date); })
       .catch(() => {
         setRatesError(true);
-        setRates({
-          INR: 1,
-          USD: 83.5,
-          EUR: 90.2,
-          GBP: 105.8,
-          CAD: 61.5,
-          AUD: 54.3,
-        });
+        setRates({ INR: 1, USD: 83.5, EUR: 90.2, GBP: 105.8, CAD: 61.5, AUD: 54.3 });
       });
   }, []);
 
-  const convertToINR = useCallback(
-    (amount, currency) => {
-      if (!rates) return amount;
-      return amount * (rates[currency] ?? 1);
-    },
-    [rates],
-  );
+  const convertToINR = useCallback((amount, currency) => {
+    if (!rates) return amount;
+    return amount * (rates[currency] ?? 1);
+  }, [rates]);
 
-  const fmtINR = (n) => {
-    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-    if (n >= 100000) return `₹${(n / 100000).toFixed(2)}L`;
-    if (n >= 1000) return `₹${(n / 1000).toFixed(1)}K`;
-    return `₹${n.toFixed(2)}`;
-  };
+  // ── fmtINR now uses exactMode from closure ─────────────────────────────────
+  const fmtINR = useCallback((n) => formatINR(n, exactMode), [exactMode]);
 
   const markReady = useCallback((which) => {
     setStatus(`${which} ready`);
@@ -539,31 +426,19 @@ export default function App() {
     const s = document.createElement("script");
     s.src = "https://apis.google.com/js/api.js";
     s.async = true;
-
     s.onload = () => {
       window.gapi.load("client", async () => {
         try {
-          await window.gapi.client.init({
-            discoveryDocs: [
-              "https://sheets.googleapis.com/$discovery/rest?version=v4",
-            ],
-          });
+          await window.gapi.client.init({ discoveryDocs: ["https://sheets.googleapis.com/$discovery/rest?version=v4"] });
           setGapiReady(true);
           markReady("GAPI");
         } catch {
-          setInitError(
-            "Google Sheets API failed to initialise. Make sure your origin is listed under Authorised JavaScript Origins in Google Cloud Console.",
-          );
+          setInitError("Google Sheets API failed to initialise. Make sure your origin is listed under Authorised JavaScript Origins in Google Cloud Console.");
           setRestoringSession(false);
         }
       });
     };
-
-    s.onerror = () => {
-      setInitError("Failed to load Google APIs – check your internet connection.");
-      setRestoringSession(false);
-    };
-
+    s.onerror = () => { setInitError("Failed to load Google APIs – check your internet connection."); setRestoringSession(false); };
     document.body.appendChild(s);
   }, [markReady]);
 
@@ -571,32 +446,20 @@ export default function App() {
     const s = document.createElement("script");
     s.src = "https://accounts.google.com/gsi/client";
     s.async = true;
-
     s.onload = () => {
       try {
         tokenRef.current = window.google.accounts.oauth2.initTokenClient({
           client_id: CLIENT_ID,
           scope: SCOPES,
           callback: (resp) => {
-            if (resp.error) {
-              showToast("❌ Sign-in error: " + resp.error);
-              return;
-            }
-
+            if (resp.error) { showToast("❌ Sign-in error: " + resp.error); return; }
             if (resp.access_token) {
-              window.gapi.client.setToken({
-                access_token: resp.access_token,
-                token_type: resp.token_type || "Bearer",
-                scope: resp.scope || SCOPES,
-                expires_in: resp.expires_in || 3600,
-              });
+              window.gapi.client.setToken({ access_token: resp.access_token, token_type: resp.token_type || "Bearer", scope: resp.scope || SCOPES, expires_in: resp.expires_in || 3600 });
               saveSessionToStorage(resp);
             }
-
             setSignedIn(true);
           },
         });
-
         setGsiReady(true);
         markReady("GSI");
       } catch {
@@ -604,74 +467,43 @@ export default function App() {
         setRestoringSession(false);
       }
     };
-
-    s.onerror = () => {
-      setInitError("Failed to load Google Sign-In script.");
-      setRestoringSession(false);
-    };
-
+    s.onerror = () => { setInitError("Failed to load Google Sign-In script."); setRestoringSession(false); };
     document.body.appendChild(s);
   }, [markReady, saveSessionToStorage, showToast]);
 
   useEffect(() => {
     if (!gapiReady || !gsiReady || restoredOnceRef.current) return;
-
     restoredOnceRef.current = true;
-    const restored = restoreSessionFromStorage();
-
-    if (!restored) {
-      setRestoringSession(false);
-    } else {
-      setRestoringSession(false);
-    }
+    restoreSessionFromStorage();
+    setRestoringSession(false);
   }, [gapiReady, gsiReady, restoreSessionFromStorage]);
 
-  const handleAuthError = useCallback(
-    (err) => {
-      const code = err?.status || err?.result?.error?.code;
-      if (code === 401 || code === 403) {
-        clearStoredSession();
-        setSignedIn(false);
-        if (window?.gapi?.client) {
-          window.gapi.client.setToken(null);
-        }
-        showToast("🔐 Session expired. Please sign in again.");
-        return true;
-      }
-      return false;
-    },
-    [clearStoredSession, showToast],
-  );
+  const handleAuthError = useCallback((err) => {
+    const code = err?.status || err?.result?.error?.code;
+    if (code === 401 || code === 403) {
+      clearStoredSession();
+      setSignedIn(false);
+      if (window?.gapi?.client) window.gapi.client.setToken(null);
+      showToast("🔐 Session expired. Please sign in again.");
+      return true;
+    }
+    return false;
+  }, [clearStoredSession, showToast]);
 
   const fetchSubs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await window.gapi.client.sheets.spreadsheets.values.get({
-        spreadsheetId: SHEET_ID,
-        range: RANGE,
-      });
-
+      const res = await window.gapi.client.sheets.spreadsheets.values.get({ spreadsheetId: SHEET_ID, range: RANGE });
       const rows = res.result.values || [];
-      setSubs(
-        rows.map((r, i) => ({
-          id: i,
-          name: r[0] || "",
-          category: r[1] || "Other",
-          amount: parseFloat(r[2]) || 0,
-          currency: r[3] || "INR",
-          billingCycle: r[4] || "Monthly",
-          nextBillingDate: r[5] || "",
-          emailId: r[6] || "",
-          userId: r[7] || "",
-          password: r[8] || "",
-          appLink: r[9] || "",
-          invoiceLink: r[10] || "",
-        })),
-      );
+      setSubs(rows.map((r, i) => ({
+        id: i, name: r[0] || "", category: r[1] || "Other",
+        amount: parseFloat(r[2]) || 0, currency: r[3] || "INR",
+        billingCycle: r[4] || "Monthly", nextBillingDate: r[5] || "",
+        emailId: r[6] || "", userId: r[7] || "", password: r[8] || "",
+        appLink: r[9] || "", invoiceLink: r[10] || "",
+      })));
     } catch (err) {
-      if (!handleAuthError(err)) {
-        showToast("❌ Could not load data from Google Sheets");
-      }
+      if (!handleAuthError(err)) showToast("❌ Could not load data from Google Sheets");
     }
     setLoading(false);
   }, [handleAuthError, showToast]);
@@ -683,143 +515,65 @@ export default function App() {
   }, [signedIn, fetchSubs]);
 
   const signIn = () => {
-    if (!tokenRef.current) {
-      showToast("⏳ Still loading...");
-      return;
-    }
+    if (!tokenRef.current) { showToast("⏳ Still loading..."); return; }
     tokenRef.current.requestAccessToken({ prompt: "consent" });
   };
 
   const signOut = () => {
     const token = window?.gapi?.client?.getToken?.();
-    if (token?.access_token && window?.google?.accounts?.oauth2) {
-      window.google.accounts.oauth2.revoke(token.access_token, () => {});
-    }
-    if (window?.gapi?.client) {
-      window.gapi.client.setToken(null);
-    }
+    if (token?.access_token && window?.google?.accounts?.oauth2) window.google.accounts.oauth2.revoke(token.access_token, () => {});
+    if (window?.gapi?.client) window.gapi.client.setToken(null);
     clearStoredSession();
     setSignedIn(false);
     setSubs([]);
     showToast("👋 Signed out");
   };
 
-  const openAdd = () => {
-    setEditItem(null);
-    setForm(EMPTY_FORM);
-    setShowPwd(false);
-    setShowModal(true);
-  };
-
+  const openAdd = () => { setEditItem(null); setForm(EMPTY_FORM); setShowPwd(false); setShowModal(true); };
   const openEdit = (sub) => {
     setEditItem(sub);
-    setForm({
-      name: sub.name,
-      category: sub.category,
-      amount: String(sub.amount),
-      currency: sub.currency,
-      billingCycle: sub.billingCycle,
-      nextBillingDate: sub.nextBillingDate,
-      emailId: sub.emailId,
-      userId: sub.userId,
-      password: sub.password,
-      appLink: sub.appLink,
-      invoiceLink: sub.invoiceLink,
-    });
+    setForm({ name: sub.name, category: sub.category, amount: String(sub.amount), currency: sub.currency, billingCycle: sub.billingCycle, nextBillingDate: sub.nextBillingDate, emailId: sub.emailId, userId: sub.userId, password: sub.password, appLink: sub.appLink, invoiceLink: sub.invoiceLink });
     setShowPwd(false);
     setShowModal(true);
   };
 
-  const rowFromForm = () => [
-    form.name,
-    form.category,
-    form.amount,
-    form.currency,
-    form.billingCycle,
-    form.nextBillingDate,
-    form.emailId,
-    form.userId,
-    form.password,
-    form.appLink,
-    form.invoiceLink,
-  ];
+  const rowFromForm = () => [form.name, form.category, form.amount, form.currency, form.billingCycle, form.nextBillingDate, form.emailId, form.userId, form.password, form.appLink, form.invoiceLink];
 
   const saveSub = async () => {
-    if (!form.name.trim() || !form.amount) {
-      return showToast("⚠️ Name and amount are required");
-    }
-
+    if (!form.name.trim() || !form.amount) return showToast("⚠️ Name and amount are required");
     setLoading(true);
     try {
       const row = rowFromForm();
-
       if (editItem !== null) {
-        await window.gapi.client.sheets.spreadsheets.values.update({
-          spreadsheetId: SHEET_ID,
-          range: `Subscriptions!A${editItem.id + 2}:K${editItem.id + 2}`,
-          valueInputOption: "RAW",
-          resource: { values: [row] },
-        });
+        await window.gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: SHEET_ID, range: `Subscriptions!A${editItem.id + 2}:K${editItem.id + 2}`, valueInputOption: "RAW", resource: { values: [row] } });
         showToast("✅ Updated!");
       } else {
-        await window.gapi.client.sheets.spreadsheets.values.append({
-          spreadsheetId: SHEET_ID,
-          range: "Subscriptions!A:K",
-          valueInputOption: "RAW",
-          resource: { values: [row] },
-        });
+        await window.gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SHEET_ID, range: "Subscriptions!A:K", valueInputOption: "RAW", resource: { values: [row] } });
         showToast("✅ Added!");
       }
-
       setShowModal(false);
       fetchSubs();
     } catch (err) {
-      if (!handleAuthError(err)) {
-        showToast("❌ Save failed – check the sheet tab is named 'Subscriptions'");
-      }
+      if (!handleAuthError(err)) showToast("❌ Save failed – check the sheet tab is named 'Subscriptions'");
     }
     setLoading(false);
   };
 
   const deleteSub = async (sub) => {
     if (!window.confirm(`Delete "${sub.name}"?`)) return;
-
     setLoading(true);
     try {
-      const meta = await window.gapi.client.sheets.spreadsheets.get({
-        spreadsheetId: SHEET_ID,
-      });
-
-      const targetSheet = meta.result.sheets.find(
-        (s) => s.properties.title === "Subscriptions",
-      );
-      const sheetId =
-        targetSheet?.properties?.sheetId ?? meta.result.sheets[0].properties.sheetId;
-
+      const meta = await window.gapi.client.sheets.spreadsheets.get({ spreadsheetId: SHEET_ID });
+      const targetSheet = meta.result.sheets.find((s) => s.properties.title === "Subscriptions");
+      const sheetId = targetSheet?.properties?.sheetId ?? meta.result.sheets[0].properties.sheetId;
       await window.gapi.client.sheets.spreadsheets.batchUpdate({
         spreadsheetId: SHEET_ID,
-        resource: {
-          requests: [
-            {
-              deleteDimension: {
-                range: {
-                  sheetId,
-                  dimension: "ROWS",
-                  startIndex: sub.id + 1,
-                  endIndex: sub.id + 2,
-                },
-              },
-            },
-          ],
-        },
+        resource: { requests: [{ deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: sub.id + 1, endIndex: sub.id + 2 } } }] },
       });
-
       showToast("🗑️ Deleted");
       fetchSubs();
     } catch (err) {
-      if (!handleAuthError(err)) {
-        showToast("❌ Delete failed");
-      }
+      if (!handleAuthError(err)) showToast("❌ Delete failed");
     }
     setLoading(false);
   };
@@ -838,33 +592,24 @@ export default function App() {
   const catTotals = CATEGORIES.map((cat) => ({
     label: cat,
     color: CATEGORY_COLORS[cat],
-    inr: subs
-      .filter((s) => s.category === cat)
-      .reduce((sum, s) => sum + toMonthlyINR(s), 0),
+    inr: subs.filter((s) => s.category === cat).reduce((sum, s) => sum + toMonthlyINR(s), 0),
   })).filter((c) => c.inr > 0);
 
   const upcoming = [...subs]
     .filter((s) => s.nextBillingDate)
     .sort((a, b) => new Date(a.nextBillingDate) - new Date(b.nextBillingDate))
     .slice(0, 5)
-    .map((s) => ({
-      ...s,
-      daysLeft: Math.ceil((new Date(s.nextBillingDate) - new Date()) / 86400000),
-    }));
+    .map((s) => ({ ...s, daysLeft: Math.ceil((new Date(s.nextBillingDate) - new Date()) / 86400000) }));
 
   const isReady = gapiReady && gsiReady;
   const maxCat = Math.max(...catTotals.map((c) => c.inr), 1);
+  const getBadgeClass = (d) => d <= 3 ? "badge badge-danger" : d <= 7 ? "badge badge-warn" : "badge badge-ok";
 
-  const getBadgeClass = (d) =>
-    d <= 3 ? "badge badge-danger" : d <= 7 ? "badge badge-warn" : "badge badge-ok";
+  const previewINR = form.amount && form.currency !== "INR" && rates
+    ? convertToINR(parseFloat(form.amount) || 0, form.currency)
+    : null;
 
-  const previewINR =
-    form.amount && form.currency !== "INR" && rates
-      ? convertToINR(parseFloat(form.amount) || 0, form.currency)
-      : null;
-
-  const setF = (key) => (e) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+  const setF = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   if (!signedIn) {
     return (
@@ -873,72 +618,36 @@ export default function App() {
         <div className="lscreen">
           <div className="lcard">
             <div className="l-icon-wrap">💳</div>
-            <div className="ltitle">
-              Sub<span>Trackr</span>
-            </div>
-            <div className="lsub">
-              Track every subscription in one place. All costs shown in ₹ with
-              live exchange rates.
-            </div>
-
+            <div className="ltitle">Sub<span>Trackr</span></div>
+            <div className="lsub">Track every subscription in one place. All costs shown in ₹ with live exchange rates.</div>
             <div className="lfeatures">
-              {[
-                ["📊", "Visual spend analytics by category"],
-                ["₹", "Live currency conversion to Rupees"],
-                ["🔔", "Upcoming renewal reminders"],
-                ["🔑", "Store credentials & invoice links"],
-                ["📥", "Export full data to Excel"],
-              ].map(([icon, text], i) => (
-                <div className="lfeat" key={i}>
-                  <div className="lfeat-icon">{icon}</div>
-                  <span>{text}</span>
-                </div>
+              {[["📊","Visual spend analytics by category"],["₹","Live currency conversion to Rupees"],["🔔","Upcoming renewal reminders"],["🔑","Store credentials & invoice links"],["📥","Export full data to Excel"]].map(([icon, text], i) => (
+                <div className="lfeat" key={i}><div className="lfeat-icon">{icon}</div><span>{text}</span></div>
               ))}
             </div>
-
             {initError ? (
               <div className="errbox">⚠️ {initError}</div>
             ) : (
               <>
                 <button className="gbtn" onClick={signIn} disabled={!isReady || restoringSession}>
                   <svg width="18" height="18" viewBox="0 0 48 48">
-                    <path
-                      fill="#4285F4"
-                      d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M2 24c0-3.3.7-6.4 1.9-9.2L8.3 19c-.5 1.6-.8 3.2-.8 5s.3 3.4.8 5l-4.4 3.8C2.7 30.4 2 27.3 2 24z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M24 46c5.6 0 10.3-1.9 13.8-5l-6.7-5.2C29.4 37.3 26.9 38 24 38c-6 0-11.1-4-12.9-9.5L6.7 32.3C10.1 39.4 16.5 46 24 46z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.3-4.3 5.7l6.7 5.2C42.1 36.2 44.5 30.5 44.5 24c0-1.3-.2-2.7-.5-4z"
-                    />
+                    <path fill="#4285F4" d="M44.5 20H24v8.5h11.8C34.7 33.9 30.1 37 24 37c-7.2 0-13-5.8-13-13s5.8-13 13-13c3.1 0 5.9 1.1 8.1 2.9l6.4-6.4C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22c11 0 21-8 21-22 0-1.3-.2-2.7-.5-4z"/>
+                    <path fill="#34A853" d="M2 24c0-3.3.7-6.4 1.9-9.2L8.3 19c-.5 1.6-.8 3.2-.8 5s.3 3.4.8 5l-4.4 3.8C2.7 30.4 2 27.3 2 24z"/>
+                    <path fill="#FBBC05" d="M24 46c5.6 0 10.3-1.9 13.8-5l-6.7-5.2C29.4 37.3 26.9 38 24 38c-6 0-11.1-4-12.9-9.5L6.7 32.3C10.1 39.4 16.5 46 24 46z"/>
+                    <path fill="#EA4335" d="M44.5 20H24v8.5h11.8c-.8 2.3-2.3 4.3-4.3 5.7l6.7 5.2C42.1 36.2 44.5 30.5 44.5 24c0-1.3-.2-2.7-.5-4z"/>
                   </svg>
-                  {restoringSession
-                    ? "Checking saved session..."
-                    : isReady
-                      ? "Continue with Google"
-                      : "Loading..."}
+                  {restoringSession ? "Checking saved session..." : isReady ? "Continue with Google" : "Loading..."}
                 </button>
-
                 {(!isReady || restoringSession) && (
                   <div className="silent-status">
                     <div className="spin spin-dark" />
-                    <span>
-                      {restoringSession ? "Restoring saved session..." : status}
-                    </span>
+                    <span>{restoringSession ? "Restoring saved session..." : status}</span>
                   </div>
                 )}
               </>
             )}
           </div>
         </div>
-
         {toast && <Toast msg={toast} onDone={() => setToast(null)} />}
       </>
     );
@@ -951,70 +660,47 @@ export default function App() {
         <div className="hdr">
           <div className="logo-wrap">
             <div className="logo-mark">💳</div>
-            <div className="logo">
-              Sub<span>Trackr</span>
-            </div>
+            <div className="logo">Sub<span>Trackr</span></div>
           </div>
           <div className="hdr-right">
             {loading && <div className="spin spin-dark" />}
+
+            {/* ── Exact Numbers Toggle ── */}
             <button
-              className="btn btn-green btn-sm"
-              onClick={() => exportToExcel(subs, rates)}
+              className={`exact-toggle${exactMode ? " active" : ""}`}
+              onClick={() => setExactMode((v) => !v)}
+              title={exactMode ? "Switch to compact view (1.2K)" : "Switch to exact numbers (1,230)"}
             >
-              📥 Export Excel
+              <div className="toggle-pill">
+                <div className="toggle-knob" />
+              </div>
+              {exactMode ? "Exact" : "Compact"}
             </button>
-            <button className="btn btn-accent" onClick={openAdd}>
-              + Add Subscription
-            </button>
-            <button className="btn btn-danger btn-sm" onClick={signOut}>
-              Sign Out
-            </button>
+
+            <button className="btn btn-green btn-sm" onClick={() => exportToExcel(subs, rates)}>📥 Export Excel</button>
+            <button className="btn btn-accent" onClick={openAdd}>+ Add Subscription</button>
+            <button className="btn btn-danger btn-sm" onClick={signOut}>Sign Out</button>
           </div>
         </div>
 
         <div className="rates-bar">
-          <span
-            className={`rates-dot ${!rates ? "rates-dot-loading" : ratesError ? "rates-dot-error" : "rates-dot-live"}`}
-          />
-          {!rates
-            ? "Fetching live exchange rates…"
-            : ratesError
-              ? "⚠️ Live rates unavailable · using approximate fallback"
-              : `Live rates · fetched ${ratesDate} · 1 USD = ₹${rates.USD?.toFixed(2)} · 1 EUR = ₹${rates.EUR?.toFixed(2)} · 1 GBP = ₹${rates.GBP?.toFixed(2)} · 1 CAD = ₹${rates.CAD?.toFixed(2)} · 1 AUD = ₹${rates.AUD?.toFixed(2)}`}
+          <span className={`rates-dot ${!rates ? "rates-dot-loading" : ratesError ? "rates-dot-error" : "rates-dot-live"}`} />
+          {!rates ? "Fetching live exchange rates…" : ratesError
+            ? "⚠️ Live rates unavailable · using approximate fallback"
+            : `Live rates · fetched ${ratesDate} · 1 USD = ₹${rates.USD?.toFixed(2)} · 1 EUR = ₹${rates.EUR?.toFixed(2)} · 1 GBP = ₹${rates.GBP?.toFixed(2)} · 1 CAD = ₹${rates.CAD?.toFixed(2)} · 1 AUD = ₹${rates.AUD?.toFixed(2)}`}
         </div>
 
         <div className="sgrid">
           {[
-            {
-              label: "Monthly Cost",
-              value: fmtINR(monthlyTotal),
-              sub: "all subs · live ₹ rate",
-              icon: "💸",
-              accent: true,
-            },
-            {
-              label: "Yearly Total",
-              value: fmtINR(yearlyTotal),
-              sub: "projected annual spend",
-              icon: "📅",
-            },
-            {
-              label: "Active Subs",
-              value: subs.length,
-              sub: "subscriptions tracked",
-              icon: "📋",
-            },
-            {
-              label: "Avg / Sub",
-              value: fmtINR(subs.length ? monthlyTotal / subs.length : 0),
-              sub: "monthly average in ₹",
-              icon: "📊",
-            },
+            { label: "Monthly Cost", value: fmtINR(monthlyTotal), sub: "all subs · live ₹ rate", icon: "💸", accent: true },
+            { label: "Yearly Total", value: fmtINR(yearlyTotal), sub: "projected annual spend", icon: "📅" },
+            { label: "Active Subs", value: subs.length, sub: "subscriptions tracked", icon: "📋" },
+            { label: "Avg / Sub", value: fmtINR(subs.length ? monthlyTotal / subs.length : 0), sub: "monthly average in ₹", icon: "📊" },
           ].map((s, i) => (
             <div className={`scard${s.accent ? " scard-accent" : ""}`} key={i}>
               <div className="scard-bg">{s.icon}</div>
               <span className="slabel">{s.label}</span>
-              <div className="sval">{s.value}</div>
+              <div className="sval" style={exactMode ? { fontSize: "1.3rem" } : {}}>{s.value}</div>
               <div className="ssub">{s.sub}</div>
             </div>
           ))}
@@ -1023,36 +709,20 @@ export default function App() {
         <div className="crow">
           <div className="card">
             <div className="ctitle">Monthly Spend by Category (₹)</div>
-            <DonutChart data={catTotals} />
+            <DonutChart data={catTotals} exact={exactMode} />
           </div>
-
           <div className="card">
             <div className="ctitle">Category Breakdown (₹ / mo)</div>
             {catTotals.length === 0 ? (
-              <div className="empty">
-                <div className="eicon">📊</div>
-                <p>No data yet</p>
-              </div>
+              <div className="empty"><div className="eicon">📊</div><p>No data yet</p></div>
             ) : (
-              [...catTotals]
-                .sort((a, b) => b.inr - a.inr)
-                .map((c, i) => (
-                  <div className="brow" key={i}>
-                    <span className="blabel">
-                      {CATEGORY_ICONS[c.label]} {c.label}
-                    </span>
-                    <div className="bwrap">
-                      <div
-                        className="bbar"
-                        style={{
-                          width: `${(c.inr / maxCat) * 100}%`,
-                          background: c.color,
-                        }}
-                      />
-                    </div>
-                    <span className="bamt">{fmtINR(c.inr)}</span>
-                  </div>
-                ))
+              [...catTotals].sort((a, b) => b.inr - a.inr).map((c, i) => (
+                <div className="brow" key={i}>
+                  <span className="blabel">{CATEGORY_ICONS[c.label]} {c.label}</span>
+                  <div className="bwrap"><div className="bbar" style={{ width: `${(c.inr / maxCat) * 100}%`, background: c.color }} /></div>
+                  <span className="bamt">{fmtINR(c.inr)}</span>
+                </div>
+              ))
             )}
           </div>
         </div>
@@ -1061,10 +731,7 @@ export default function App() {
           <div className="card">
             <div className="ctitle">Upcoming Renewals</div>
             {upcoming.length === 0 ? (
-              <div className="empty">
-                <div className="eicon">📅</div>
-                <p>Add billing dates to track renewals</p>
-              </div>
+              <div className="empty"><div className="eicon">📅</div><p>Add billing dates to track renewals</p></div>
             ) : (
               upcoming.map((s, i) => (
                 <div className="uitem" key={i}>
@@ -1075,14 +742,9 @@ export default function App() {
                   <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
                     <span className={getBadgeClass(s.daysLeft)}>{s.daysLeft}d</span>
                     <div className="uamt-wrap">
-                      <div className="uamt">
-                        {fmtINR(convertToINR(s.amount, s.currency))}
-                      </div>
+                      <div className="uamt">{fmtINR(convertToINR(s.amount, s.currency))}</div>
                       {s.currency !== "INR" && (
-                        <div className="uamt-orig">
-                          {sym(s.currency)}
-                          {s.amount}
-                        </div>
+                        <div className="uamt-orig">{sym(s.currency)}{s.amount}</div>
                       )}
                     </div>
                   </div>
@@ -1090,29 +752,17 @@ export default function App() {
               ))
             )}
           </div>
-
           <div className="card">
             <div className="ctitle">Billing Cycle Split</div>
             {subs.length === 0 ? (
-              <div className="empty">
-                <div className="eicon">🔄</div>
-                <p>No subscriptions yet</p>
-              </div>
+              <div className="empty"><div className="eicon">🔄</div><p>No subscriptions yet</p></div>
             ) : (
               BILLING_CYCLES.map((cycle) => {
                 const count = subs.filter((s) => s.billingCycle === cycle).length;
                 return count > 0 ? (
                   <div className="brow" key={cycle}>
                     <span className="blabel">{cycle}</span>
-                    <div className="bwrap">
-                      <div
-                        className="bbar"
-                        style={{
-                          width: `${(count / subs.length) * 100}%`,
-                          background: "linear-gradient(90deg,#E8572A,#FF8A5B)",
-                        }}
-                      />
-                    </div>
+                    <div className="bwrap"><div className="bbar" style={{ width: `${(count / subs.length) * 100}%`, background: "linear-gradient(90deg,#E8572A,#FF8A5B)" }} /></div>
                     <span className="bamt">{count}</span>
                   </div>
                 ) : null;
@@ -1123,36 +773,19 @@ export default function App() {
 
         <div className="twrap">
           <div className="thdr">
-            <div className="thdr-title">
-              All Subscriptions{" "}
-              <span style={{ color: "var(--text3)", fontWeight: 500 }}>
-                ({subs.length})
-              </span>
-            </div>
+            <div className="thdr-title">All Subscriptions <span style={{ color: "var(--text3)", fontWeight: 500 }}>({subs.length})</span></div>
             <div className="thdr-right">
-              <button
-                className="btn btn-ghost btn-sm"
-                onClick={fetchSubs}
-                disabled={loading}
-              >
-                ↻ Refresh
-              </button>
+              <button className="btn btn-ghost btn-sm" onClick={fetchSubs} disabled={loading}>↻ Refresh</button>
             </div>
           </div>
-
           {subs.length === 0 ? (
-            <div className="empty">
-              <div className="eicon">💳</div>
-              <p>No subscriptions yet — add your first one!</p>
-            </div>
+            <div className="empty"><div className="eicon">💳</div><p>No subscriptions yet — add your first one!</p></div>
           ) : (
             <div className="table-scroll">
               <table>
                 <thead>
                   <tr>
-                    <th>Name</th>
-                    <th>Category</th>
-                    <th>Amount (₹)</th>
+                    <th>Name</th><th>Category</th><th>Amount (₹)</th>
                     <th className="hide-mobile">Cycle</th>
                     <th className="hide-mobile">Next Bill</th>
                     <th className="hide-mobile">Links</th>
@@ -1162,80 +795,31 @@ export default function App() {
                 <tbody>
                   {subs.map((sub, i) => (
                     <tr key={i}>
+                      <td><strong style={{ fontWeight: 600 }}>{sub.name}</strong></td>
                       <td>
-                        <strong style={{ fontWeight: 600 }}>{sub.name}</strong>
-                      </td>
-                      <td>
-                        <span
-                          className="chip"
-                          style={{
-                            background: CATEGORY_COLORS[sub.category] + "1A",
-                            color: CATEGORY_COLORS[sub.category],
-                            border: `1px solid ${CATEGORY_COLORS[sub.category]}33`,
-                          }}
-                        >
+                        <span className="chip" style={{ background: CATEGORY_COLORS[sub.category] + "1A", color: CATEGORY_COLORS[sub.category], border: `1px solid ${CATEGORY_COLORS[sub.category]}33` }}>
                           {CATEGORY_ICONS[sub.category]} {sub.category}
                         </span>
                       </td>
                       <td>
-                        <div className="amount-cell">
-                          {fmtINR(convertToINR(sub.amount, sub.currency))}
-                        </div>
+                        <div className="amount-cell">{fmtINR(convertToINR(sub.amount, sub.currency))}</div>
                         {sub.currency !== "INR" && (
-                          <div className="amount-orig">
-                            {sym(sub.currency)}
-                            {sub.amount.toFixed(2)} · 1 {sub.currency} = ₹
-                            {rates?.[sub.currency]?.toFixed(2)}
-                          </div>
+                          <div className="amount-orig">{sym(sub.currency)}{sub.amount.toFixed(2)} · 1 {sub.currency} = ₹{rates?.[sub.currency]?.toFixed(2)}</div>
                         )}
                       </td>
-                      <td
-                        className="hide-mobile"
-                        style={{ color: "var(--text3)", fontSize: "0.82rem" }}
-                      >
-                        {sub.billingCycle}
-                      </td>
-                      <td
-                        className="hide-mobile"
-                        style={{ color: "var(--text3)", fontSize: "0.82rem" }}
-                      >
-                        {sub.nextBillingDate || "—"}
-                      </td>
+                      <td className="hide-mobile" style={{ color: "var(--text3)", fontSize: "0.82rem" }}>{sub.billingCycle}</td>
+                      <td className="hide-mobile" style={{ color: "var(--text3)", fontSize: "0.82rem" }}>{sub.nextBillingDate || "—"}</td>
                       <td className="hide-mobile">
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
-                          {sub.appLink && (
-                            <a
-                              href={sub.appLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="link-cell"
-                            >
-                              🔗 App
-                            </a>
-                          )}
-                          {sub.invoiceLink && (
-                            <a
-                              href={sub.invoiceLink}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="link-cell"
-                            >
-                              🧾 Invoice
-                            </a>
-                          )}
-                          {!sub.appLink && !sub.invoiceLink && (
-                            <span style={{ color: "var(--text3)" }}>—</span>
-                          )}
+                          {sub.appLink && <a href={sub.appLink} target="_blank" rel="noopener noreferrer" className="link-cell">🔗 App</a>}
+                          {sub.invoiceLink && <a href={sub.invoiceLink} target="_blank" rel="noopener noreferrer" className="link-cell">🧾 Invoice</a>}
+                          {!sub.appLink && !sub.invoiceLink && <span style={{ color: "var(--text3)" }}>—</span>}
                         </div>
                       </td>
                       <td>
                         <div className="acts">
-                          <button className="ibtn" onClick={() => openEdit(sub)} title="Edit">
-                            ✏️
-                          </button>
-                          <button className="ibtn" onClick={() => deleteSub(sub)} title="Delete">
-                            🗑️
-                          </button>
+                          <button className="ibtn" onClick={() => openEdit(sub)} title="Edit">✏️</button>
+                          <button className="ibtn" onClick={() => deleteSub(sub)} title="Delete">🗑️</button>
                         </div>
                       </td>
                     </tr>
@@ -1250,182 +834,82 @@ export default function App() {
       {showModal && (
         <div className="ov" onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
           <div className="modal">
-            <div className="modal-title">
-              {editItem !== null ? "Edit Subscription" : "Add Subscription"}
-            </div>
+            <div className="modal-title">{editItem !== null ? "Edit Subscription" : "Add Subscription"}</div>
             <div className="modal-sub">Fields marked optional can be filled later.</div>
-
             <div className="section-divider">📋 Basic Info</div>
-
             <div className="fg">
               <label>Service Name</label>
-              <input
-                placeholder="e.g. Netflix, Figma, Slack…"
-                value={form.name}
-                onChange={setF("name")}
-              />
+              <input placeholder="e.g. Netflix, Figma, Slack…" value={form.name} onChange={setF("name")} />
             </div>
-
             <div className="frow">
               <div className="fg">
                 <label>Amount</label>
-                <input
-                  type="number"
-                  placeholder="199"
-                  value={form.amount}
-                  onChange={setF("amount")}
-                />
+                <input type="number" placeholder="199" value={form.amount} onChange={setF("amount")} />
                 {previewINR !== null && previewINR > 0 && (
-                  <div className="preview-inr">
-                    ≈ <strong>{fmtINR(previewINR)}</strong>
-                    <span style={{ color: "var(--text3)" }}>
-                      · 1 {form.currency} = ₹{rates?.[form.currency]?.toFixed(2)}
-                    </span>
-                  </div>
+                  <div className="preview-inr">≈ <strong>{fmtINR(previewINR)}</strong><span style={{ color: "var(--text3)" }}>· 1 {form.currency} = ₹{rates?.[form.currency]?.toFixed(2)}</span></div>
                 )}
               </div>
-
               <div className="fg">
                 <label>Currency</label>
                 <select value={form.currency} onChange={setF("currency")}>
-                  {CURRENCIES.map((c) => (
-                    <option key={c} value={c}>
-                      {sym(c)} {c}
-                    </option>
-                  ))}
+                  {CURRENCIES.map((c) => <option key={c} value={c}>{sym(c)} {c}</option>)}
                 </select>
               </div>
             </div>
-
             <div className="frow">
               <div className="fg">
                 <label>Category</label>
                 <select value={form.category} onChange={setF("category")}>
-                  {CATEGORIES.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
+                  {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </div>
-
               <div className="fg">
                 <label>Billing Cycle</label>
                 <select value={form.billingCycle} onChange={setF("billingCycle")}>
-                  {BILLING_CYCLES.map((c) => (
-                    <option key={c}>{c}</option>
-                  ))}
+                  {BILLING_CYCLES.map((c) => <option key={c}>{c}</option>)}
                 </select>
               </div>
             </div>
-
             <div className="fg">
               <label>Next Billing Date</label>
               <div className="date-wrap">
-                <input
-                  type="date"
-                  value={form.nextBillingDate}
-                  onChange={setF("nextBillingDate")}
-                  onClick={(e) => {
-                    try {
-                      e.target.showPicker();
-                    } catch (_) {}
-                  }}
-                />
+                <input type="date" value={form.nextBillingDate} onChange={setF("nextBillingDate")} onClick={(e) => { try { e.target.showPicker(); } catch (_) {} }} />
                 <span className="date-icon">📅</span>
               </div>
             </div>
-
-            <div className="section-divider">
-              🔑 Credentials <span className="optional-tag">(optional)</span>
-            </div>
-
+            <div className="section-divider">🔑 Credentials <span className="optional-tag">(optional)</span></div>
             <div className="frow">
               <div className="fg">
                 <label>Email ID</label>
-                <input
-                  type="email"
-                  placeholder="team@company.com"
-                  value={form.emailId}
-                  onChange={setF("emailId")}
-                />
+                <input type="email" placeholder="team@company.com" value={form.emailId} onChange={setF("emailId")} />
               </div>
-
               <div className="fg">
                 <label>User ID / Username</label>
-                <input
-                  placeholder="username or account ID"
-                  value={form.userId}
-                  onChange={setF("userId")}
-                />
+                <input placeholder="username or account ID" value={form.userId} onChange={setF("userId")} />
               </div>
             </div>
-
             <div className="fg">
               <label>Password</label>
               <div className="pwd-input-wrap">
-                <input
-                  type={showPwd ? "text" : "password"}
-                  placeholder="app password"
-                  value={form.password}
-                  onChange={setF("password")}
-                />
-                <button className="pwd-eye" onClick={() => setShowPwd((s) => !s)} type="button">
-                  {showPwd ? "🙈" : "👁️"}
-                </button>
+                <input type={showPwd ? "text" : "password"} placeholder="app password" value={form.password} onChange={setF("password")} />
+                <button className="pwd-eye" onClick={() => setShowPwd((s) => !s)} type="button">{showPwd ? "🙈" : "👁️"}</button>
               </div>
             </div>
-
-            <div className="section-divider">
-              🔗 Links <span className="optional-tag">(optional)</span>
-            </div>
-
+            <div className="section-divider">🔗 Links <span className="optional-tag">(optional)</span></div>
             <div className="fg">
               <label>App Link</label>
-              <input
-                type="url"
-                placeholder="https://app.example.com"
-                value={form.appLink}
-                onChange={setF("appLink")}
-              />
+              <input type="url" placeholder="https://app.example.com" value={form.appLink} onChange={setF("appLink")} />
             </div>
-
             <div className="fg">
-              <label>
-                Invoice Link <span className="optional-tag">Google Drive / any URL</span>
-              </label>
+              <label>Invoice Link <span className="optional-tag">Google Drive / any URL</span></label>
               <div style={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-                <input
-                  type="url"
-                  placeholder="https://drive.google.com/file/d/…"
-                  value={form.invoiceLink}
-                  onChange={setF("invoiceLink")}
-                  style={{ flex: 1 }}
-                />
-
-                <a
-                  href="https://drive.google.com/drive/folders/1tEXcIxpxpnmStMno0gzUk_qqpC1m8Mg8"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-ghost btn-sm"
-                  style={{
-                    whiteSpace: "nowrap",
-                    textDecoration: "none",
-                    flexShrink: 0,
-                  }}
-                  title="Open invoices folder in Google Drive"
-                >
-                  📂 Open Drive
-                </a>
+                <input type="url" placeholder="https://drive.google.com/file/d/…" value={form.invoiceLink} onChange={setF("invoiceLink")} style={{ flex: 1 }} />
+                <a href="https://drive.google.com/drive/folders/1tEXcIxpxpnmStMno0gzUk_qqpC1m8Mg8" target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm" style={{ whiteSpace: "nowrap", textDecoration: "none", flexShrink: 0 }} title="Open invoices folder in Google Drive">📂 Open Drive</a>
               </div>
-
-              <div className="drive-hint">
-                💡 Upload invoice to Drive → right-click → Copy link → paste here
-              </div>
+              <div className="drive-hint">💡 Upload invoice to Drive → right-click → Copy link → paste here</div>
             </div>
-
             <div className="macts">
-              <button className="btn btn-ghost" onClick={() => setShowModal(false)}>
-                Cancel
-              </button>
+              <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
               <button className="btn btn-accent" onClick={saveSub} disabled={loading}>
                 {loading ? <span className="spin" /> : editItem !== null ? "Update" : "Add Subscription"}
               </button>
