@@ -2,42 +2,227 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+
+    <!-- ── Favicon & App Icons ── -->
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta
-      name="description"
-      content="Web site created using create-react-app"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
-    <!--
-      manifest.json provides metadata used when your web app is installed on a
-      user's mobile device or desktop. See https://developers.google.com/web/fundamentals/web-app-manifest/
-    -->
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/logo.png" />
+    <link rel="icon" type="image/png" sizes="32x32"  href="%PUBLIC_URL%/logo.png" />
+    <link rel="icon" type="image/png" sizes="16x16"  href="%PUBLIC_URL%/logo.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-    <!--
-      Notice the use of %PUBLIC_URL% in the tags above.
-      It will be replaced with the URL of the `public` folder during the build.
-      Only files inside the `public` folder can be referenced from the HTML.
 
-      Unlike "/favicon.ico" or "favicon.ico", "%PUBLIC_URL%/favicon.ico" will
-      work correctly both with client-side routing and a non-root public URL.
-      Learn how to configure a non-root public URL by running `npm run build`.
-    -->
-    <title>React App</title>
+    <!-- ── Viewport & Theme ── -->
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#E8572A" />
+
+    <!-- ── SEO / Meta ── -->
+    <title>SubTrackr — Subscription Manager</title>
+    <meta name="description" content="Track every subscription in one place. Live ₹ conversion, renewal alerts, spend analytics, and credential storage — all synced to Google Sheets." />
+    <meta name="keywords"     content="subscription tracker, expense manager, SaaS tracker, INR, Google Sheets" />
+    <meta name="author"       content="SubTrackr" />
+    <meta name="robots"       content="noindex, nofollow" />
+
+    <!-- ── Open Graph ── -->
+    <meta property="og:type"        content="website" />
+    <meta property="og:title"       content="SubTrackr — Subscription Manager" />
+    <meta property="og:description" content="Track every subscription in one place. Live ₹ conversion, renewal alerts and spend analytics." />
+    <meta property="og:image"       content="%PUBLIC_URL%/logo.png" />
+
+    <!-- ── Fonts ── -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+
+    <!-- ── Loading Screen ── -->
+    <style>
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      :root {
+        --bg:     #FAFAF8;
+        --accent: #E8572A;
+        --text:   #1A1916;
+        --text3:  #9E9B94;
+        --border: #E8E6DF;
+      }
+
+      html, body {
+        height: 100%;
+        background: var(--bg);
+        font-family: 'Space Grotesk', sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      #root { height: 100%; }
+
+      /* ── Splash loader shown until React hydrates ── */
+      #app-loader {
+        position: fixed;
+        inset: 0;
+        background: var(--bg);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.5rem;
+        z-index: 9999;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
+      }
+
+      #app-loader.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .loader-logo {
+        width: 68px;
+        height: 68px;
+        background: var(--accent);
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 12px 32px rgba(232, 87, 42, 0.38);
+        animation: logoPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      }
+
+      .loader-logo svg {
+        width: 36px;
+        height: 36px;
+      }
+
+      .loader-wordmark {
+        font-family: 'Plus Jakarta Sans', sans-serif;
+        font-size: 1.6rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        animation: fadeUp 0.5s 0.15s ease both;
+      }
+
+      .loader-wordmark span { color: var(--accent); }
+
+      .loader-tagline {
+        font-size: 0.78rem;
+        color: var(--text3);
+        font-weight: 500;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        animation: fadeUp 0.5s 0.25s ease both;
+        margin-top: -0.75rem;
+      }
+
+      /* Animated 3-dot progress */
+      .loader-dots {
+        display: flex;
+        gap: 0.45rem;
+        animation: fadeUp 0.5s 0.35s ease both;
+      }
+
+      .loader-dots span {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--border);
+        animation: dotPulse 1.2s ease-in-out infinite;
+      }
+
+      .loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+      .loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+      @keyframes logoPop {
+        from { transform: scale(0.6) rotate(-8deg); opacity: 0; }
+        to   { transform: scale(1) rotate(0deg);   opacity: 1; }
+      }
+
+      @keyframes fadeUp {
+        from { transform: translateY(10px); opacity: 0; }
+        to   { transform: translateY(0);    opacity: 1; }
+      }
+
+      @keyframes dotPulse {
+        0%, 100% { background: var(--border);  transform: scale(1);    }
+        50%       { background: var(--accent); transform: scale(1.35); }
+      }
+
+      /* Thin accent progress bar at top */
+      .loader-progress {
+        position: fixed;
+        top: 0; left: 0;
+        height: 3px;
+        background: var(--accent);
+        border-radius: 0 3px 3px 0;
+        animation: progress 2.2s cubic-bezier(0.1, 0.4, 0.6, 1) forwards;
+        box-shadow: 0 0 10px rgba(232, 87, 42, 0.5);
+      }
+
+      @keyframes progress {
+        from { width: 0%;   opacity: 1; }
+        80%  { width: 85%;  opacity: 1; }
+        to   { width: 100%; opacity: 0; }
+      }
+    </style>
   </head>
+
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>
+      <div style="font-family:sans-serif;text-align:center;padding:4rem;color:#6B6860;">
+        ⚠️ SubTrackr requires JavaScript to run. Please enable it in your browser settings.
+      </div>
+    </noscript>
+
+    <!-- Loading splash (hidden once React mounts) -->
+    <div id="app-loader" aria-hidden="true">
+      <div class="loader-progress"></div>
+
+      <div class="loader-logo">
+        <!-- Inline logo mark: card + rising bars -->
+        <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Card -->
+          <rect x="2" y="9" width="24" height="15" rx="3" fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.6)" stroke-width="1.4"/>
+          <rect x="2" y="13" width="24" height="4" fill="rgba(255,255,255,0.2)"/>
+          <!-- Chip -->
+          <rect x="5" y="17" width="5" height="4" rx="1" fill="rgba(255,255,255,0.7)"/>
+          <!-- Rising bars -->
+          <rect x="27" y="19" width="3" height="6" rx="1" fill="rgba(255,255,255,0.55)"/>
+          <rect x="31" y="16" width="3" height="9" rx="1" fill="rgba(255,255,255,0.8)"/>
+          <!-- Tick -->
+          <polyline points="31,14 33,11 35,13" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <div class="loader-wordmark">Sub<span>Trackr</span></div>
+      <div class="loader-tagline">Subscription Intelligence</div>
+
+      <div class="loader-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+
+    <!-- React root -->
     <div id="root"></div>
-    <!--
-      This HTML file is a template.
-      If you open it directly in the browser, you will see an empty page.
 
-      You can add webfonts, meta tags, or analytics to this file.
-      The build step will place the bundled scripts into the <body> tag.
+    <!-- Hide loader once React has painted -->
+    <script>
+      (function () {
+        var loader = document.getElementById('app-loader');
+        if (!loader) return;
 
-      To begin the development, run `npm start` or `yarn start`.
-      To create a production bundle, use `npm run build` or `yarn build`.
-    -->
+        // Use MutationObserver to detect when React renders into #root
+        var root = document.getElementById('root');
+        var observer = new MutationObserver(function () {
+          if (root.children.length > 0) {
+            loader.classList.add('hidden');
+            observer.disconnect();
+          }
+        });
+        observer.observe(root, { childList: true, subtree: true });
+
+        // Fallback: hide after 5s regardless
+        setTimeout(function () {
+          loader.classList.add('hidden');
+          observer.disconnect();
+        }, 5000);
+      })();
+    </script>
   </body>
 </html>
