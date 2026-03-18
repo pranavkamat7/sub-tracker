@@ -4,14 +4,14 @@ const CLIENT_ID =
   "872324162882-nsn0o9lmv770lm61ijul6conkeuqp1pt.apps.googleusercontent.com";
 const SHEET_ID = "18qPN8GXUvlJvW2STFFnj6vmKxPgD8vuqjtish7CdTQw";
 const SCOPES = "https://www.googleapis.com/auth/spreadsheets";
-const RANGE = "Subscriptions!A2:K";
+const RANGE = "Subscriptions!A2:L";
 
 const SESSION_KEY = "subtrackr_google_session";
 const SESSION_MAX_AGE = 24 * 60 * 60 * 1000;
 
 const CATEGORIES = ["Design","Social Media","BD","Tech","Ops","SEO","Other"];
 const CURRENCIES = ["INR", "USD", "EUR", "GBP", "CAD", "AUD"];
-const BILLING_CYCLES = ["Monthly", "Yearly", "Weekly", "Quarterly"];
+const BILLING_CYCLES = ["Monthly", "Yearly", "Weekly", "Quarterly", "Custom"];
 
 const CATEGORY_COLORS = {
   Design: "#F43F5E","Social Media": "#8B5CF6",BD: "#22C55E",Tech: "#3B82F6",
@@ -42,16 +42,20 @@ async function fetchRatesToINR() {
 }
 
 function exportToExcel(subs, rates) {
-  const headers = ["Name","Category","Amount","Currency","Billing Cycle","Next Billing Date","Email ID","User ID","Password","App Link","Invoice Link","Monthly Cost (INR)"];
+  const headers = ["Name","Category","Amount","Currency","Billing Cycle","Next Billing Date","Email ID","User ID","Password","App Link","Invoice Link","Custom Months","Monthly Cost (INR)"];
   const toMonthlyINR = (sub) => {
     const r = rates || {};
     const inr = sub.amount * (r[sub.currency] ?? 1);
     if (sub.billingCycle === "Yearly") return inr / 12;
     if (sub.billingCycle === "Weekly") return inr * 4.33;
     if (sub.billingCycle === "Quarterly") return inr / 3;
+    if (sub.billingCycle === "Custom") {
+      const m = parseFloat(sub.customMonths) || 1;
+      return inr / m;
+    }
     return inr;
   };
-  const rows = subs.map((s) => [s.name,s.category,s.amount,s.currency,s.billingCycle,s.nextBillingDate,s.emailId,s.userId,s.password,s.appLink,s.invoiceLink,toMonthlyINR(s).toFixed(2)]);
+  const rows = subs.map((s) => [s.name,s.category,s.amount,s.currency,s.billingCycle,s.nextBillingDate,s.emailId,s.userId,s.password,s.appLink,s.invoiceLink,s.customMonths||"",toMonthlyINR(s).toFixed(2)]);
   let html = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="UTF-8"><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Subscriptions</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--></head><body><table border="1">`;
   html += `<tr>${headers.map((h) => `<th style="background:#1A1916;color:#fff;font-weight:bold;padding:8px 12px;">${h}</th>`).join("")}</tr>`;
   rows.forEach((row, ri) => { html += `<tr>${row.map((cell) => `<td style="padding:6px 12px;background:${ri % 2 === 0 ? "#FAFAF8" : "#fff"}">${cell ?? ""}</td>`).join("")}</tr>`; });
@@ -237,6 +241,10 @@ const css = `
   @keyframes rot { to{transform:rotate(360deg)} }
   .errbox { background: #FEE2E2; border: 1.5px solid #FECACA; border-radius: 12px; padding: 1rem; color: #DC2626; font-size: 0.82rem; margin-top: 1rem; line-height: 1.6; text-align: left; }
   .table-scroll { overflow-x: auto; }
+  .custom-months-wrap { margin-top: 0.6rem; animation: slideDown 0.2s cubic-bezier(0.16,1,0.3,1); }
+  @keyframes slideDown { from{opacity:0;transform:translateY(-6px)} to{opacity:1;transform:translateY(0)} }
+  .custom-months-hint { font-size: 0.72rem; color: var(--text3); margin-top: 0.35rem; display: flex; align-items: center; gap: 0.3rem; }
+  .cycle-tag { font-size: 0.68rem; color: var(--text3); font-weight: 500; margin-left: 0.3rem; font-family: var(--font-body); }
   .date-wrap { position: relative; }
   .date-icon { position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); font-size: 1rem; pointer-events: none; color: var(--text3); }
 `;
@@ -331,7 +339,7 @@ function DonutChart({ data, exact }) {
 const EMPTY_FORM = {
   name: "", category: "Design", amount: "", currency: "INR",
   billingCycle: "Monthly", nextBillingDate: "", emailId: "",
-  userId: "", password: "", appLink: "", invoiceLink: "",
+  userId: "", password: "", appLink: "", invoiceLink: "", customMonths: "",
 };
 
 export default function App() {
@@ -500,7 +508,7 @@ export default function App() {
         amount: parseFloat(r[2]) || 0, currency: r[3] || "INR",
         billingCycle: r[4] || "Monthly", nextBillingDate: r[5] || "",
         emailId: r[6] || "", userId: r[7] || "", password: r[8] || "",
-        appLink: r[9] || "", invoiceLink: r[10] || "",
+        appLink: r[9] || "", invoiceLink: r[10] || "", customMonths: r[11] || "",
       })));
     } catch (err) {
       if (!handleAuthError(err)) showToast("❌ Could not load data from Google Sheets");
@@ -532,23 +540,26 @@ export default function App() {
   const openAdd = () => { setEditItem(null); setForm(EMPTY_FORM); setShowPwd(false); setShowModal(true); };
   const openEdit = (sub) => {
     setEditItem(sub);
-    setForm({ name: sub.name, category: sub.category, amount: String(sub.amount), currency: sub.currency, billingCycle: sub.billingCycle, nextBillingDate: sub.nextBillingDate, emailId: sub.emailId, userId: sub.userId, password: sub.password, appLink: sub.appLink, invoiceLink: sub.invoiceLink });
+    setForm({ name: sub.name, category: sub.category, amount: String(sub.amount), currency: sub.currency, billingCycle: sub.billingCycle, nextBillingDate: sub.nextBillingDate, emailId: sub.emailId, userId: sub.userId, password: sub.password, appLink: sub.appLink, invoiceLink: sub.invoiceLink, customMonths: sub.customMonths || "" });
     setShowPwd(false);
     setShowModal(true);
   };
 
-  const rowFromForm = () => [form.name, form.category, form.amount, form.currency, form.billingCycle, form.nextBillingDate, form.emailId, form.userId, form.password, form.appLink, form.invoiceLink];
+  const rowFromForm = () => [form.name, form.category, form.amount, form.currency, form.billingCycle, form.nextBillingDate, form.emailId, form.userId, form.password, form.appLink, form.invoiceLink, form.billingCycle === "Custom" ? form.customMonths : ""];
 
   const saveSub = async () => {
     if (!form.name.trim() || !form.amount) return showToast("⚠️ Name and amount are required");
+    if (form.billingCycle === "Custom" && (!form.customMonths || parseFloat(form.customMonths) < 1)) {
+      return showToast("⚠️ Please enter how many months for the custom cycle");
+    }
     setLoading(true);
     try {
       const row = rowFromForm();
       if (editItem !== null) {
-        await window.gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: SHEET_ID, range: `Subscriptions!A${editItem.id + 2}:K${editItem.id + 2}`, valueInputOption: "RAW", resource: { values: [row] } });
+        await window.gapi.client.sheets.spreadsheets.values.update({ spreadsheetId: SHEET_ID, range: `Subscriptions!A${editItem.id + 2}:L${editItem.id + 2}`, valueInputOption: "RAW", resource: { values: [row] } });
         showToast("✅ Updated!");
       } else {
-        await window.gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SHEET_ID, range: "Subscriptions!A:K", valueInputOption: "RAW", resource: { values: [row] } });
+        await window.gapi.client.sheets.spreadsheets.values.append({ spreadsheetId: SHEET_ID, range: "Subscriptions!A:L", valueInputOption: "RAW", resource: { values: [row] } });
         showToast("✅ Added!");
       }
       setShowModal(false);
@@ -583,6 +594,10 @@ export default function App() {
     if (sub.billingCycle === "Yearly") return inr / 12;
     if (sub.billingCycle === "Weekly") return inr * 4.33;
     if (sub.billingCycle === "Quarterly") return inr / 3;
+    if (sub.billingCycle === "Custom") {
+      const m = parseFloat(sub.customMonths) || 1;
+      return inr / m;
+    }
     return inr;
   };
 
@@ -674,7 +689,7 @@ export default function App() {
               <div className="toggle-pill">
                 <div className="toggle-knob" />
               </div>
-              {exactMode ? "Exact" : "Compact"}
+              {exactMode ? "Exact #s" : "Compact"}
             </button>
 
             <button className="btn btn-green btn-sm" onClick={() => exportToExcel(subs, rates)}>📥 Export Excel</button>
@@ -807,7 +822,11 @@ export default function App() {
                           <div className="amount-orig">{sym(sub.currency)}{sub.amount.toFixed(2)} · 1 {sub.currency} = ₹{rates?.[sub.currency]?.toFixed(2)}</div>
                         )}
                       </td>
-                      <td className="hide-mobile" style={{ color: "var(--text3)", fontSize: "0.82rem" }}>{sub.billingCycle}</td>
+                      <td className="hide-mobile" style={{ color: "var(--text3)", fontSize: "0.82rem" }}>
+                        {sub.billingCycle === "Custom"
+                          ? <>Custom <span style={{color:"var(--accent)",fontWeight:600}}>({sub.customMonths || "?"}mo)</span></>
+                          : sub.billingCycle}
+                      </td>
                       <td className="hide-mobile" style={{ color: "var(--text3)", fontSize: "0.82rem" }}>{sub.nextBillingDate || "—"}</td>
                       <td className="hide-mobile">
                         <div style={{ display: "flex", flexDirection: "column", gap: "0.25rem" }}>
@@ -866,10 +885,50 @@ export default function App() {
               <div className="fg">
                 <label>Billing Cycle</label>
                 <select value={form.billingCycle} onChange={setF("billingCycle")}>
-                  {BILLING_CYCLES.map((c) => <option key={c}>{c}</option>)}
+                  {BILLING_CYCLES.map((c) => (
+                    <option key={c} value={c}>
+                      {c === "Custom" ? "Custom (every N months)" : c}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
+            {form.billingCycle === "Custom" && (
+              <div className="custom-months-wrap">
+                <div className="fg" style={{ marginBottom: 0 }}>
+                  <label>
+                    Every how many months?
+                    <span className="optional-tag">e.g. 4 = once every 4 months</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="60"
+                    placeholder="e.g. 4"
+                    value={form.customMonths}
+                    onChange={setF("customMonths")}
+                    style={{ maxWidth: "160px" }}
+                  />
+                  {form.customMonths && parseFloat(form.customMonths) > 0 && form.amount && (
+                    <div className="preview-inr" style={{ marginTop: "0.5rem" }}>
+                      Monthly cost ≈{" "}
+                      <strong>
+                        {fmtINR(
+                          convertToINR(parseFloat(form.amount) || 0, form.currency) /
+                            parseFloat(form.customMonths)
+                        )}
+                      </strong>
+                      <span style={{ color: "var(--text3)" }}>
+                        · ₹{(convertToINR(parseFloat(form.amount)||0, form.currency)).toFixed(2)} ÷ {form.customMonths}mo
+                      </span>
+                    </div>
+                  )}
+                  <div className="custom-months-hint">
+                    💡 Amount will be divided by {form.customMonths || "N"} to calculate monthly cost
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="fg">
               <label>Next Billing Date</label>
               <div className="date-wrap">
